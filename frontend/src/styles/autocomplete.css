@@ -1,0 +1,109 @@
+/* frontend/src/styles/autocomplete.css - 자동완성 스타일 */
+
+/* 자동완성 드롭다운 컨테이너 */
+.autocomplete-dropdown {
+  position: absolute;
+  z-index: 50;
+  width: 100%;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* 자동완성 아이템 */
+.autocomplete-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover {
+  background-color: #eff6ff;
+  border-left-color: #3b82f6;
+  transform: translateX(2px);
+}
+
+.autocomplete-item:active {
+  background-color: #dbeafe;
+}
+
+/* 장소명 스타일 */
+.autocomplete-place-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* 주소 스타일 */
+.autocomplete-address {
+  font-size: 13px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+
+/* 검색 중 로딩 스피너 */
+.search-loading {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.search-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 위치 입력 필드 */
+.location-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.15s ease;
+}
+
+.location-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 안내 텍스트 */
+.autocomplete-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* 결과 없음 메시지 */
+.no-results {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}

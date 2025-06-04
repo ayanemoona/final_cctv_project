@@ -1,0 +1,31 @@
+# Django 기본
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# 인증 및 보안
+PyJWT==2.8.0
+python-dotenv==1.0.0
+
+# 🤖 AI 연동을 위한 HTTP 클라이언트
+httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+
+# 이미지 및 파일 처리
+Pillow==10.1.0
+
+# 데이터베이스
+psycopg2-binary==2.9.9
+
+# 날짜 처리
+python-dateutil==2.8.2
+
+# Supabase (선택사항 - 문제시 제거)
+# supabase==2.0.2
+
+# 🤖 비동기 처리 (문제 패키지 제거)
+# asyncio-compat==0.1.2
+
+# 로깅
+colorlog==6.8.0

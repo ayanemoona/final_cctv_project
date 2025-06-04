@@ -1,0 +1,70 @@
+/* src/styles/typography.css - 타이포그래피 */
+
+/* 기본 텍스트 크기 - App.css와 중복 제거됨 */
+/* App.css에서 이미 정의하므로 여기서는 제거 */
+
+/* 추가 타이포그래피 스타일 */
+.heading-primary {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.heading-secondary {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.3;
+}
+
+.heading-tertiary {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.body-text {
+  font-size: 1rem;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.caption-text {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.small-text {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  line-height: 1.3;
+}
+
+/* 특수 텍스트 스타일 */
+.text-muted {
+  color: #6b7280;
+}
+
+.text-emphasis {
+  font-weight: 600;
+  color: #111827;
+}
+
+.text-danger {
+  color: #dc2626;
+}
+
+.text-success {
+  color: #16a34a;
+}
+
+.text-warning {
+  color: #d97706;
+}
+
+.text-info {
+  color: #2563eb;
+}

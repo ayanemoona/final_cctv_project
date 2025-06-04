@@ -1,0 +1,268 @@
+/* src/styles/tracking.css - 추적 페이지 전용 */
+
+.tracking-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9fafb;
+}
+
+.tracking-content {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 30%;
+  min-width: 400px;
+  max-width: 500px;
+  background-color: white;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-area {
+  width: 70%;
+  flex: 1;
+  position: relative;
+}
+
+.case-info-panel {
+  padding: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.case-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.case-meta {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.suspect-card {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.action-buttons {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.action-btn-cctv {
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  background-color: white;
+}
+
+.action-btn-cctv:hover {
+  background-color: #fef2f2;
+}
+
+.action-btn-manual {
+  border: 1px solid #3b82f6;
+  color: #3b82f6;
+  background-color: white;
+}
+
+.action-btn-manual:hover {
+  background-color: #eff6ff;
+}
+
+.markers-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.markers-header {
+  padding: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.marker-item {
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.marker-item:hover {
+  background-color: #f9fafb;
+}
+
+.marker-item.selected {
+  background-color: #eff6ff;
+  border-left: 4px solid #3b82f6;
+}
+
+.marker-time {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.marker-location {
+  font-size: 0.875rem;
+  color: #111827;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.marker-comment {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+
+.marker-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.status-confirmed {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.status-excluded {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.confidence-score {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* 지도 영역 */
+.map-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom right, #dbeafe, #bfdbfe);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  color: #374151;
+}
+
+.map-controls {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 10;
+}
+
+.map-control-btn {
+  padding: 0.75rem;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease-in-out;
+  font-size: 1.25rem;
+}
+
+.map-control-btn:hover {
+  background-color: #f9fafb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 진행 상황 표시 */
+.progress-overlay {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  min-width: 250px;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  color: #374151;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 0.25rem;
+  background-color: #e5e7eb;
+  border-radius: 0.125rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #3b82f6;
+  border-radius: 0.125rem;
+  transition: width 0.3s ease-in-out;
+}
+
+/* 반응형 */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 35%;
+    min-width: 350px;
+  }
+  
+  .map-area {
+    width: 65%;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 40%;
+    min-width: 300px;
+  }
+  
+  .map-area {
+    width: 60%;
+  }
+}

@@ -1,0 +1,103 @@
+# police-cctv-system/docker-compose.yml
+services:
+  # 🔷 데이터베이스
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: police_cctv
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 🤖 AI 서비스들
+  yolo-service:
+    build: ./yolo-service
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    volumes:
+      - ./shared_storage/models:/app/models
+    environment:
+      - YOLO_PORT=8001
+
+  clothing-service:
+    build: ./hybrid-clothing-service
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    environment:
+      - CLOTHING_PORT=8002
+
+  video-service:
+    build: ./video-service
+    ports:
+      - "8004:8004"
+    depends_on:
+      - yolo-service
+      - clothing-service
+    restart: unless-stopped
+    environment:
+      - VIDEO_PORT=8004
+      - YOLO_SERVICE_URL=http://yolo-service:8001
+      - CLOTHING_SERVICE_URL=http://clothing-service:8002
+
+  # ⚠️ 폴더명 수정: ai-gateway → api-gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8010:8000"
+    depends_on:
+      - yolo-service
+      - clothing-service
+      - video-service
+    restart: unless-stopped
+    environment:
+      - YOLO_SERVICE_URL=http://yolo-service:8001
+      - CLOTHING_SERVICE_URL=http://clothing-service:8002
+      - VIDEO_SERVICE_URL=http://video-service:8004
+
+  # 🟦 Django 백엔드
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - api-gateway
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgres://postgres:password@db:5432/police_cctv
+      - AI_GATEWAY_URL=http://api-gateway:8000
+      - YOLO_SERVICE_URL=http://yolo-service:8001
+      - CLOTHING_SERVICE_URL=http://clothing-service:8002
+      - VIDEO_SERVICE_URL=http://video-service:8004
+    volumes:
+      - ./backend:/app
+      - ./shared_storage/media:/app/media
+    restart: unless-stopped
+
+  # 🟢 React 프론트엔드
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_AI_GATEWAY_URL=http://localhost:8010
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    driver: bridge
