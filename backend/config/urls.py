@@ -14,6 +14,10 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# backend/config/urls.py - 인증 URL 포함 완전 수정
+
+# backend/config/urls.py - 기존 authentication 앱 사용
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -32,20 +36,10 @@ def home_view(request):
             "admin": "/admin/",
             "api_auth": "/api/auth/",
             "api_cases": "/api/cases/",
+            "health": "/health/"
         }
     })
 
-urlpatterns = [
-    # 홈페이지
-    path('', home_view, name='home'),
-    
-    # 관리자
-    path('admin/', admin.site.urls),
-    
-    # API 엔드포인트 (활성화)
-    path('api/auth/', include('apps.authentication.urls')),
-    path('api/cases/', include('apps.cases.urls')),
-]
 @csrf_exempt
 def health_check(request):
     """헬스체크 엔드포인트"""
@@ -56,9 +50,18 @@ def health_check(request):
     })
 
 urlpatterns = [
+    # 홈페이지
+    path('', home_view, name='home'),
+    
+    # 관리자
     path('admin/', admin.site.urls),
+    
+    # 헬스체크
+    path('health/', health_check, name='health_check'),
+    
+    # API 엔드포인트 - 기존 authentication 앱 사용
+    path('api/auth/', include('apps.authentication.urls')),
     path('api/cases/', include('apps.cases.urls')),
-    path('health/', health_check, name='health_check'),  # 추가
 ]
 
 # 개발 환경에서 미디어 파일 서빙
