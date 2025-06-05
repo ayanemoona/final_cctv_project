@@ -27,7 +27,7 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
     console.log("🔑 API 키:", KAKAO_MAP_API_KEY ? '설정됨' : '미설정');
 
     const script = document.createElement("script");
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_API_KEY}&autoload=false&libraries=services`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_API_KEY}&autoload=false&libraries=services`;
 
     console.log("📜 스크립트 URL:", script.src);
 

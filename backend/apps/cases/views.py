@@ -1,4 +1,4 @@
-# backend/apps/cases/views.py - AI 연동 강화 버전
+# backend/apps/cases/views.py - 로그인 사용자 인증 수정 버전
 
 import json
 from django.http import JsonResponse
@@ -80,13 +80,12 @@ class CasesAPIView(View):
             
             logger.info(f"📝 받은 데이터: {title}, {location}, {suspect_description}")
             
-            # 현재 사용자 가져오기
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            admin_user = User.objects.filter(is_superuser=True).first()
+            # ✅ 현재 로그인된 사용자 확인 (수정된 부분)
+            if not request.user.is_authenticated:
+                return JsonResponse({'error': '로그인이 필요합니다'}, status=401)
             
-            if not admin_user:
-                return JsonResponse({'error': '관리자 계정이 필요합니다'}, status=400)
+            current_user = request.user
+            logger.info(f"👤 로그인된 사용자: {current_user.username}")
             
             # 필수 필드 검증
             if not title or not location or not description:
@@ -105,7 +104,7 @@ class CasesAPIView(View):
                 except Exception as date_error:
                     return JsonResponse({'error': '올바른 날짜 형식을 입력해주세요'}, status=400)
             
-            # 사건 생성
+            # ✅ 사건 생성 (로그인된 사용자 사용)
             case = Case.objects.create(
                 case_number=case_number,
                 title=title,
@@ -113,7 +112,7 @@ class CasesAPIView(View):
                 incident_date=incident_date_parsed,
                 description=description,
                 status=status,
-                created_by=admin_user
+                created_by=current_user  # ✅ 수정: 로그인된 사용자 사용
             )
             
             logger.info(f"✅ 사건 생성 성공: {case.id} - {case.title}")
@@ -460,9 +459,13 @@ def case_markers(request, case_id):
             return JsonResponse({'error': f'서버 오류: {str(e)}'}, status=500)
     
     elif request.method == 'POST':
-        # 수동 마커 추가 (기존 로직 유지)
+        # ✅ 수동 마커 추가 (로그인된 사용자 사용하도록 수정)
         try:
             case = get_object_or_404(Case, id=case_id)
+            
+            # 로그인 확인
+            if not request.user.is_authenticated:
+                return JsonResponse({'error': '로그인이 필요합니다'}, status=401)
             
             location_name = request.POST.get('location_name', '').strip()
             detected_at = request.POST.get('detected_at', '')
@@ -488,10 +491,8 @@ def case_markers(request, case_id):
             if detected_at_parsed.tzinfo is None:
                 detected_at_parsed = timezone.make_aware(detected_at_parsed)
             
-            # 현재 사용자
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            admin_user = User.objects.filter(is_superuser=True).first()
+            # ✅ 현재 로그인된 사용자 사용
+            current_user = request.user
             
             # 순서 번호 자동 설정
             last_marker = case.cctv_markers.order_by('-sequence_order').first()
@@ -510,7 +511,7 @@ def case_markers(request, case_id):
                 is_confirmed=is_confirmed,
                 is_excluded=is_excluded,
                 sequence_order=next_sequence,
-                created_by=admin_user,
+                created_by=current_user,  # ✅ 수정: 로그인된 사용자 사용
                 crop_image_url='',
                 analysis_id=''  # 수동 추가는 빈 문자열
             )

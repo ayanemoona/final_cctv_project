@@ -58,12 +58,7 @@ export const casesService = {
         }
       }
 
-      const response = await api.post('/cases/', formData, {
-        headers: {
-          // ✅ Content-Type을 multipart/form-data로 설정 (FormData 사용 시 자동 설정됨)
-          // 'Content-Type': 'multipart/form-data' // axios가 자동으로 설정
-        },
-      });
+      const response = await api.post('/cases/', formData);
       
       console.log('사건 생성 성공:', response.data);
       return response.data;
