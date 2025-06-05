@@ -2,7 +2,7 @@
 import os
 
 # AI 서비스 URL 설정
-AI_GATEWAY_URL = os.getenv('AI_GATEWAY_URL', 'http://api-gateway:8000')
+AI_GATEWAY_URL = os.getenv('AI_GATEWAY_URL', 'http://localhost:8010')
 YOLO_SERVICE_URL = os.getenv('YOLO_SERVICE_URL', 'http://localhost:8001')
 CLOTHING_SERVICE_URL = os.getenv('CLOTHING_SERVICE_URL', 'http://localhost:8002')
 VIDEO_SERVICE_URL = os.getenv('VIDEO_SERVICE_URL', 'http://localhost:8004')
@@ -67,7 +67,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8010",  # AI Gateway
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True  # 개발용 (프로덕션에서는 False)
 
 # 헬스체크 엔드포인트 추가
 HEALTH_CHECK = {

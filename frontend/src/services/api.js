@@ -2,15 +2,12 @@
 import axios from 'axios';
 
 // API 기본 설정
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = 'http://localhost:8000/api';
 
 // Axios 인스턴스 생성
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // 10초 타임아웃
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true,
 });
 
 // 요청 인터셉터 - 인증 토큰 자동 추가
@@ -18,8 +15,17 @@ api.interceptors.request.use(
   (config) => {
     // localStorage에서 토큰 가져오기 (있는 경우)
     const token = localStorage.getItem('authToken');
+    // 🚨 강제 디버깅 로그 추가
+    console.log('🚀 API 요청 디버깅:');
+    console.log('  URL:', config.url);
+    console.log('  Method:', config.method?.toUpperCase());
+    console.log('  localStorage authToken:', localStorage.getItem('authToken'));
+    console.log('  localStorage user:', localStorage.getItem('user'));
+    console.log('  토큰 존재 여부:', !!token);
+    console.log('  토큰 값:', token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Authorization 헤더 추가:', config.headers.Authorization);
     }
     
     console.log('API 요청:', config.method?.toUpperCase(), config.url);

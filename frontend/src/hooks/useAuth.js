@@ -10,16 +10,18 @@ export const useAuth = () => {
 
   // 로컬 스토리지에서 인증 정보 복원
   useEffect(() => {
-    const savedAuth = localStorage.getItem('police_auth');
-    if (savedAuth) {
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user');
+    if (savedToken && savedUser) {
       try {
-        const authData = JSON.parse(savedAuth);
-        setUser(authData.user);
-        setToken(authData.token);
-        authService.apiService?.setAuthToken(authData.token);
+        const userData = JSON.parse(savedUser);
+        setUser(userData);
+        setToken(savedToken);
+        
       } catch (err) {
         console.error('저장된 인증 정보 복원 실패:', err);
-        localStorage.removeItem('police_auth');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
       }
     }
     setLoading(false);
@@ -32,17 +34,10 @@ export const useAuth = () => {
       
       const response = await authService.login(credentials);
       
-      const authData = {
-        user: response.user,
-        token: response.token
-      };
-      
       setUser(response.user);
       setToken(response.token);
       
-      // 로컬 스토리지에 저장
-      localStorage.setItem('police_auth', JSON.stringify(authData));
-      
+
       return response;
     } catch (err) {
       setError(err.message);
@@ -60,7 +55,7 @@ export const useAuth = () => {
     } finally {
       setUser(null);
       setToken(null);
-      localStorage.removeItem('police_auth');
+    
     }
   };
 

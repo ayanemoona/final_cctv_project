@@ -38,6 +38,8 @@ INSTALLED_APPS = [
 
 # CORS 설정
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -114,7 +116,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework 정상 인증 설정
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',  # 토큰 인증 사용
+        'apps.authentication.authentication.SimpleTokenAuthentication',  # 토큰 인증 사용
+        'rest_framework.authentication.SessionAuthentication',  # 세션 인증 추가
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',  # 인증 필요
