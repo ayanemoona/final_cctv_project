@@ -194,8 +194,164 @@ class CasesAPIView(APIView):
             traceback.print_exc()
             return Response({'error': f'서버 오류: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class CaseMarkersAPIView(APIView):
+    """사건 마커 API - DRF APIView로 인증 정상화"""
+    
+    authentication_classes = [SimpleTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, case_id):
+        """마커 목록 조회"""
+        try:
+            case = get_object_or_404(Case, id=case_id)
+            markers = case.cctv_markers.all().order_by('detected_at')
+            
+            markers_data = []
+            for marker in markers:
+                markers_data.append({
+                    'id': str(marker.id),
+                    'location_name': marker.location_name,
+                    'detected_at': marker.detected_at.isoformat() if marker.detected_at else None,
+                    'confidence_score': float(marker.confidence_score) if marker.confidence_score else 0,
+                    'confidence_percentage': f"{marker.confidence_score * 100:.1f}%",
+                    'is_confirmed': marker.is_confirmed,
+                    'is_excluded': marker.is_excluded,
+                    'police_comment': marker.police_comment or '',
+                    'latitude': marker.latitude if marker.latitude else None,
+                    'longitude': marker.longitude if marker.longitude else None,
+                    'sequence_order': marker.sequence_order if hasattr(marker, 'sequence_order') else 0,
+                    'crop_image_url': marker.crop_image_url,
+                    'analysis_id': marker.analysis_id,
+                    'ai_generated': bool(marker.analysis_id)
+                })
+            
+            logger.info(f"사건 {case_id}의 마커 개수: {len(markers_data)}")
+            return Response(markers_data, status=status.HTTP_200_OK)
+            
+        except Case.DoesNotExist:
+            return Response({'error': '사건을 찾을 수 없습니다'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"마커 목록 조회 에러: {e}")
+            return Response({'error': f'서버 오류: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def post(self, request, case_id):
+        """마커 추가"""
+        try:
+            logger.info(f"🔍 마커 추가 시작 - 사건 ID: {case_id}")
+            logger.info(f"👤 인증된 사용자: {request.user.username}")
+            
+            # 사건 존재 확인
+            case = get_object_or_404(Case, id=case_id)
+            
+            # FormData에서 데이터 추출
+            location_name = request.data.get('location_name', '').strip()
+            detected_at = request.data.get('detected_at', '')
+            police_comment = request.data.get('police_comment', '').strip()
+            confidence_score = float(request.data.get('confidence_score', 1.0))
+            is_confirmed = request.data.get('is_confirmed', 'true').lower() == 'true'
+            is_excluded = request.data.get('is_excluded', 'false').lower() == 'true'
+            
+            logger.info(f"📝 받은 데이터: {location_name}, {detected_at}, {police_comment}")
+            
+            # 필수 필드 검증
+            if not location_name:
+                return Response({'error': '위치명을 입력해주세요'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not detected_at:
+                return Response({'error': '발견 시간을 입력해주세요'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not police_comment:
+                return Response({'error': '경찰 사견을 입력해주세요'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 날짜 처리
+            from django.utils.dateparse import parse_datetime
+            from django.utils import timezone
+            
+            try:
+                detected_at_parsed = parse_datetime(detected_at)
+                if detected_at_parsed and detected_at_parsed.tzinfo is None:
+                    detected_at_parsed = timezone.make_aware(detected_at_parsed)
+            except Exception as date_error:
+                logger.warning(f"날짜 파싱 실패: {date_error}")
+                return Response({'error': '올바른 날짜 형식을 입력해주세요'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 마커 생성
+            marker = CCTVMarker.objects.create(
+                case=case,
+                location_name=location_name,
+                detected_at=detected_at_parsed,
+                police_comment=police_comment,
+                confidence_score=confidence_score,
+                is_confirmed=is_confirmed,
+                is_excluded=is_excluded,
+                created_by=request.user,  # 인증된 사용자
+                sequence_order=case.cctv_markers.count() + 1  # 순서 자동 설정
+            )
+            
+            # 용의자 사진 처리 (있는 경우)
+            suspect_image = request.FILES.get('suspect_image')
+            if suspect_image:
+                try:
+                    from django.conf import settings
+                    
+                    # 미디어 폴더 경로 설정
+                    if hasattr(settings, 'BASE_DIR'):
+                        media_dir = os.path.join(settings.BASE_DIR, 'media', 'markers')
+                    else:
+                        media_dir = os.path.join(os.getcwd(), 'media', 'markers')
+                    
+                    os.makedirs(media_dir, exist_ok=True)
+                    
+                    # 파일 저장
+                    file_path = os.path.join(media_dir, f"marker_{marker.id}.jpg")
+                    with open(file_path, 'wb') as f:
+                        for chunk in suspect_image.chunks():
+                            f.write(chunk)
+                    
+                    marker.crop_image_url = f"/media/markers/marker_{marker.id}.jpg"
+                    marker.save()
+                    
+                    logger.info(f"📷 마커 이미지 저장됨: {file_path}")
+                except Exception as file_error:
+                    logger.error(f"📷 파일 저장 실패: {file_error}")
+            
+            logger.info(f"✅ 마커 생성 성공: {marker.id} - {marker.location_name}")
+            
+            # 응답 데이터 구성
+            response_data = {
+                'id': str(marker.id),
+                'location_name': marker.location_name,
+                'detected_at': marker.detected_at.isoformat() if marker.detected_at else None,
+                'confidence_score': float(marker.confidence_score),
+                'confidence_percentage': f"{marker.confidence_score * 100:.1f}%",
+                'is_confirmed': marker.is_confirmed,
+                'is_excluded': marker.is_excluded,
+                'police_comment': marker.police_comment or '',
+                'latitude': marker.latitude,
+                'longitude': marker.longitude,
+                'sequence_order': marker.sequence_order,
+                'crop_image_url': marker.crop_image_url,
+                'analysis_id': marker.analysis_id,
+                'ai_generated': bool(marker.analysis_id),
+                'created_at': marker.created_at.isoformat()
+            }
+            
+            logger.info(f"✅ 마커 추가 완료: {marker.location_name}")
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Case.DoesNotExist:
+            return Response({'error': '사건을 찾을 수 없습니다'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"❌ 마커 추가 에러: {e}")
+            import traceback
+            traceback.print_exc()
+            return Response({'error': f'서버 오류: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # 뷰 함수 래핑
 cases_api = CasesAPIView.as_view()
+case_markers = CaseMarkersAPIView.as_view()
 
 # 나머지 함수들은 그대로 유지
 from django.views.decorators.csrf import csrf_exempt
@@ -227,47 +383,6 @@ def case_detail(request, case_id):
     except Exception as e:
         logger.error(f"사건 상세 조회 에러: {e}")
         return JsonResponse({'error': f'서버 오류: {str(e)}'}, status=500)
-
-@csrf_exempt  
-def case_markers(request, case_id):
-    """사건의 마커 목록 조회 및 추가"""
-    
-    if request.method == 'GET':
-        # 마커 목록 조회
-        try:
-            case = get_object_or_404(Case, id=case_id)
-            markers = case.cctv_markers.all().order_by('detected_at')
-            
-            markers_data = []
-            for marker in markers:
-                markers_data.append({
-                    'id': str(marker.id),
-                    'location_name': marker.location_name,
-                    'detected_at': marker.detected_at.isoformat() if marker.detected_at else None,
-                    'confidence_score': float(marker.confidence_score) if marker.confidence_score else 0,
-                    'confidence_percentage': f"{marker.confidence_score * 100:.1f}%",
-                    'is_confirmed': marker.is_confirmed,
-                    'is_excluded': marker.is_excluded,
-                    'police_comment': marker.police_comment or '',
-                    'latitude': marker.latitude if marker.latitude else None,
-                    'longitude': marker.longitude if marker.longitude else None,
-                    'sequence_order': marker.sequence_order if hasattr(marker, 'sequence_order') else 0,
-                    'crop_image_url': marker.crop_image_url,
-                    'analysis_id': marker.analysis_id,
-                    'ai_generated': bool(marker.analysis_id)
-                })
-            
-            logger.info(f"사건 {case_id}의 마커 개수: {len(markers_data)}")
-            return JsonResponse(markers_data, safe=False, json_dumps_params={'ensure_ascii': False})
-            
-        except Case.DoesNotExist:
-            return JsonResponse({'error': '사건을 찾을 수 없습니다'}, status=404)
-        except Exception as e:
-            logger.error(f"마커 목록 조회 에러: {e}")
-            return JsonResponse({'error': f'서버 오류: {str(e)}'}, status=500)
-    
-    else:
-        return JsonResponse({'error': '지원하지 않는 메서드입니다'}, status=405)
 
 # 🤖 AI 관련 엔드포인트들 (미구현)
 @csrf_exempt

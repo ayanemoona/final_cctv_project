@@ -1,9 +1,9 @@
-// src/components/tracking/ManualMarkerModal.jsx - CSS 분리 + 클릭 반영 수정
+// src/components/tracking/ManualMarkerModal.jsx - 외부 클릭 감지 수정
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { LoadingSpinner } from '../common/LoadingSpinner.jsx';
-import '../../styles/autocomplete.css'; // ✅ 기존에 사용하던 CSS
+import '../../styles/autocomplete.css';
 
 export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
   const [formData, setFormData] = useState({
@@ -20,6 +20,7 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef(null);
   const inputRef = useRef(null);
+  const dropdownRef = useRef(null); // ✅ 드롭다운 ref 추가
   
   // ✅ 중복 실행 방지를 위한 ref
   const isProcessingRef = useRef(false);
@@ -32,7 +33,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
       return;
     }
 
-    // ✅ 이미 검색 중이면 중단
     if (isProcessingRef.current) {
       console.log('🔍 이미 검색 중이므로 요청 무시:', keyword);
       return;
@@ -44,10 +44,9 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     
     ps.keywordSearch(keyword, (data, status) => {
       setIsSearching(false);
-      isProcessingRef.current = false; // ✅ 검색 완료
+      isProcessingRef.current = false;
       
       if (status === window.kakao.maps.services.Status.OK) {
-        // 상위 5개 결과만 표시
         const results = data.slice(0, 5).map(place => ({
           id: place.id,
           place_name: place.place_name,
@@ -75,15 +74,12 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
       location_name: value
     }));
 
-    // 기존 타이머 클리어
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // ✅ 검색 처리 상태 초기화
     isProcessingRef.current = false;
 
-    // 500ms 후 검색 실행 (디바운스)
     if (value.length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         searchPlaces(value);
@@ -94,13 +90,12 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     }
   };
 
-  // ✅ 검색 결과 클릭 반영 수정
+  // ✅ 수정된 검색 결과 클릭 처리 함수
   const handleSuggestionClick = (suggestion) => {
     console.log('🖱️ 검색 결과 클릭:', suggestion);
     
-    // 이미 처리 중이면 무시
     if (isProcessingRef.current) {
-      console.log('📍 이미 처리 중이므로 클릭 무시:', suggestion.place_name);
+      console.log('📍 이미 처리 중이므로 클릭 무시');
       return;
     }
 
@@ -110,29 +105,16 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     
     console.log('📍 선택된 주소:', selectedAddress);
     
-    // ✅ 즉시 formData 업데이트
-    setFormData(prev => {
-      const newData = {
-        ...prev,
-        location_name: selectedAddress
-      };
-      console.log('✅ formData 업데이트됨:', newData);
-      return newData;
-    });
+    setFormData(prev => ({
+      ...prev,
+      location_name: selectedAddress
+    }));
     
-    // ✅ 즉시 드롭다운 숨기기
     setShowSuggestions(false);
     setSearchResults([]);
     
-    // ✅ input 필드에 직접 값 설정 (React가 업데이트하지 못할 경우 대비)
-    if (inputRef.current) {
-      inputRef.current.value = selectedAddress;
-      console.log('📋 input 필드 직접 업데이트:', selectedAddress);
-    }
-    
     console.log('📍 장소 선택 완료:', selectedAddress);
     
-    // ✅ 처리 완료 후 잠시 후 상태 초기화
     setTimeout(() => {
       isProcessingRef.current = false;
     }, 100);
@@ -166,7 +148,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     
     console.log('📝 폼 제출 시도, 현재 formData:', formData);
     
-    // ✅ 이미 제출 중이면 중단
     if (loading) {
       console.log('📝 이미 제출 중이므로 요청 무시');
       return;
@@ -175,10 +156,9 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     setLoading(true);
     
     try {
-      // 임시 데이터로 마커 생성
       const markerData = {
         ...formData,
-        confidence_score: 1.0, // 수동 추가는 100% 신뢰도
+        confidence_score: 1.0,
         is_confirmed: true,
         is_excluded: false
       };
@@ -187,7 +167,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
       
       await onAdd(markerData);
       
-      // 폼 초기화
       const resetData = {
         location_name: '',
         detected_at: '',
@@ -198,11 +177,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
       setFormData(resetData);
       setSearchResults([]);
       setShowSuggestions(false);
-      
-      // ✅ input 필드도 직접 초기화
-      if (inputRef.current) {
-        inputRef.current.value = '';
-      }
       
       console.log('✅ 마커 추가 완료 및 폼 초기화');
       
@@ -217,7 +191,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
   // ✅ 모달이 닫힐 때 상태 초기화
   useEffect(() => {
     if (!isOpen) {
-      // 모달이 닫히면 모든 상태 초기화
       setSearchResults([]);
       setShowSuggestions(false);
       setIsSearching(false);
@@ -240,10 +213,14 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
     };
   }, []);
 
-  // ✅ 외부 클릭 시 드롭다운 숨기기
+  // ✅ 수정된 외부 클릭 감지 - input과 드롭다운 둘 다 포함
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (inputRef.current && !inputRef.current.contains(event.target)) {
+      const isClickInsideInput = inputRef.current && inputRef.current.contains(event.target);
+      const isClickInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
+      
+      // input도 드롭다운도 아닌 곳을 클릭했을 때만 닫기
+      if (!isClickInsideInput && !isClickInsideDropdown) {
         setShowSuggestions(false);
         console.log('🖱️ 외부 클릭으로 드롭다운 숨김');
       }
@@ -254,14 +231,6 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showSuggestions]);
-
-  // ✅ formData.location_name 변경 감지해서 input 동기화
-  useEffect(() => {
-    if (inputRef.current && inputRef.current.value !== formData.location_name) {
-      inputRef.current.value = formData.location_name;
-      console.log('🔄 input 필드 동기화:', formData.location_name);
-    }
-  }, [formData.location_name]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📍 수동 마커 추가">
@@ -290,9 +259,12 @@ export const ManualMarkerModal = ({ isOpen, onClose, onAdd }) => {
               </div>
             )}
             
-            {/* ✅ 자동완성 드롭다운 - 클릭 반영 수정 */}
+            {/* ✅ 자동완성 드롭다운 - ref 추가 */}
             {showSuggestions && searchResults.length > 0 && (
-              <div className="autocomplete-dropdown">
+              <div 
+                ref={dropdownRef} 
+                className="autocomplete-dropdown"
+              >
                 {searchResults.map((suggestion, index) => (
                   <div
                     key={`${suggestion.id || index}-${suggestion.place_name}`}

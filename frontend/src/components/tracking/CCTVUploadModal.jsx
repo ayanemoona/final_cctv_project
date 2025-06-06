@@ -1,30 +1,30 @@
 // frontend/src/components/tracking/CCTVUploadModal.jsx - 완전한 AI 연동 버전
-import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Video, MapPin, Zap, AlertCircle } from 'lucide-react';
-import { Modal } from '../common/Modal.jsx';
-import { LoadingSpinner } from '../common/LoadingSpinner.jsx';
-import { trackingService } from '../../services/trackingService.js';
-import '../../styles/autocomplete.css'; // ✅ 기존 CSS 파일 사용
+import React, { useState, useRef, useEffect } from "react";
+import { Upload, Video, MapPin, Zap, AlertCircle } from "lucide-react";
+import { Modal } from "../common/Modal.jsx";
+import { LoadingSpinner } from "../common/LoadingSpinner.jsx";
+import { trackingService } from "../../services/trackingService.js";
+import "../../styles/autocomplete.css"; // ✅ 기존 CSS 파일 사용
 
 export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
   const [formData, setFormData] = useState({
-    location_name: '',
+    location_name: "",
     cctv_video: null,
-    suspect_description: '',
-    incident_time: ''
+    suspect_description: "",
+    incident_time: "",
   });
-  
+
   // 🤖 AI 분석 관련 상태
   const [analysisState, setAnalysisState] = useState({
     isAnalyzing: false,
     analysisId: null,
     progress: 0,
-    status: 'idle',
-    statusMessage: '',
+    status: "idle",
+    statusMessage: "",
     results: null,
-    error: null
+    error: null,
   });
-  
+
   // 기존 상태들
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -34,6 +34,7 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const isProcessingRef = useRef(false);
+  const dropdownRef = useRef(null);
 
   // 카카오맵 장소 검색
   const searchPlaces = (keyword) => {
@@ -44,29 +45,29 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
     }
 
     if (isProcessingRef.current) {
-      console.log('🔍 이미 검색 중이므로 요청 무시:', keyword);
+      console.log("🔍 이미 검색 중이므로 요청 무시:", keyword);
       return;
     }
 
     isProcessingRef.current = true;
     setIsSearching(true);
     const ps = new window.kakao.maps.services.Places();
-    
+
     ps.keywordSearch(keyword, (data, status) => {
       setIsSearching(false);
       isProcessingRef.current = false;
-      
+
       if (status === window.kakao.maps.services.Status.OK) {
-        const results = data.slice(0, 5).map(place => ({
+        const results = data.slice(0, 5).map((place) => ({
           id: place.id,
           place_name: place.place_name,
           road_address_name: place.road_address_name || place.address_name,
-          category_name: place.category_group_name || place.category_name
+          category_name: place.category_group_name || place.category_name,
         }));
-        
+
         setSearchResults(results);
         setShowSuggestions(true);
-        console.log('🔍 CCTV 위치 검색 결과:', results.length, '개');
+        console.log("🔍 CCTV 위치 검색 결과:", results.length, "개");
       } else {
         setSearchResults([]);
         setShowSuggestions(false);
@@ -76,7 +77,7 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   const handleLocationChange = (e) => {
     const value = e.target.value;
-    setFormData(prev => ({ ...prev, location_name: value }));
+    setFormData((prev) => ({ ...prev, location_name: value }));
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -98,14 +99,15 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
     if (isProcessingRef.current) return;
 
     isProcessingRef.current = true;
-    const selectedAddress = suggestion.road_address_name || suggestion.place_name;
-    
-    setFormData(prev => ({ ...prev, location_name: selectedAddress }));
+    const selectedAddress =
+      suggestion.road_address_name || suggestion.place_name;
+
+    setFormData((prev) => ({ ...prev, location_name: selectedAddress }));
     setShowSuggestions(false);
     setSearchResults([]);
-    
-    console.log('📍 CCTV 위치 선택 완료:', selectedAddress);
-    
+
+    console.log("📍 CCTV 위치 선택 완료:", selectedAddress);
+
     setTimeout(() => {
       isProcessingRef.current = false;
     }, 100);
@@ -113,79 +115,90 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   const validateVideoFile = (file) => {
     const maxSize = 500 * 1024 * 1024; // 500MB
-    const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/mkv'];
-    
+    const allowedTypes = [
+      "video/mp4",
+      "video/avi",
+      "video/mov",
+      "video/wmv",
+      "video/mkv",
+    ];
+
     if (file.size > maxSize) {
-      alert('파일 크기는 500MB 이하여야 합니다.');
+      alert("파일 크기는 500MB 이하여야 합니다.");
       return false;
     }
-    
+
     if (!allowedTypes.includes(file.type)) {
-      alert('지원되는 비디오 형식: MP4, AVI, MOV, WMV, MKV');
+      alert("지원되는 비디오 형식: MP4, AVI, MOV, WMV, MKV");
       return false;
     }
-    
+
     return true;
   };
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    
-    if (name === 'location_name') {
+
+    if (name === "location_name") {
       handleLocationChange(e);
       return;
     }
-    
+
     if (files && files[0]) {
       const file = files[0];
-      
-      if (name === 'cctv_video') {
+
+      if (name === "cctv_video") {
         if (validateVideoFile(file)) {
-          setFormData(prev => ({ ...prev, [name]: file }));
-          console.log('📹 CCTV 비디오 선택됨:', file.name);
+          setFormData((prev) => ({ ...prev, [name]: file }));
+          console.log("📹 CCTV 비디오 선택됨:", file.name);
         } else {
           if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            fileInputRef.current.value = "";
           }
         }
       }
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   // 🤖 AI 분석 프로그레스 콜백들
   const handleAnalysisProgress = (progressData) => {
-    setAnalysisState(prev => ({
+    setAnalysisState((prev) => ({
       ...prev,
       progress: progressData.progress,
       status: progressData.status,
-      statusMessage: trackingService.getAnalysisStatusMessage(progressData.status, progressData.progress)
+      statusMessage: trackingService.getAnalysisStatusMessage(
+        progressData.status,
+        progressData.progress
+      ),
     }));
-    
-    console.log(`🔄 분석 진행: ${progressData.progress}% - ${progressData.status}`);
+
+    console.log(
+      `🔄 분석 진행: ${progressData.progress}% - ${progressData.status}`
+    );
   };
 
   const handleAnalysisComplete = (results) => {
-    setAnalysisState(prev => ({
+    setAnalysisState((prev) => ({
       ...prev,
       isAnalyzing: false,
       progress: 100,
-      status: 'completed',
+      status: "completed",
       statusMessage: `✅ 분석 완료! ${results.markers_created}개 마커 생성됨`,
-      results: results
+      results: results,
     }));
-    
-    console.log('🎉 AI 분석 완료:', results);
-    
+
+    console.log("🎉 AI 분석 완료:", results);
+
     // 부모 컴포넌트에 완료 알림
     onUpload({
       success: true,
       analysis_id: results.analysis_id,
       markers_created: results.markers_created,
-      markers: results.markers
+      markers: results.markers,
     });
-    
+
     // 성공 메시지 표시 후 모달 닫기
     setTimeout(() => {
       handleClose();
@@ -193,64 +206,67 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
   };
 
   const handleAnalysisError = (error) => {
-    setAnalysisState(prev => ({
+    setAnalysisState((prev) => ({
       ...prev,
       isAnalyzing: false,
-      status: 'error',
+      status: "error",
       statusMessage: `❌ 분석 실패: ${error.message}`,
-      error: error.message
+      error: error.message,
     }));
-    
-    console.error('❌ AI 분석 에러:', error);
+
+    console.error("❌ AI 분석 에러:", error);
     alert(`분석 실패: ${error.message}`);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (loading || analysisState.isAnalyzing) {
-      console.log('🚫 이미 처리 중이므로 요청 무시');
+      console.log("🚫 이미 처리 중이므로 요청 무시");
       return;
     }
 
     if (!formData.cctv_video) {
-      alert('CCTV 영상을 선택해주세요.');
+      alert("CCTV 영상을 선택해주세요.");
       return;
     }
-    
+
     if (!formData.location_name.trim()) {
-      alert('CCTV 위치를 입력해주세요.');
+      alert("CCTV 위치를 입력해주세요.");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      console.log('🤖 AI 분석 시작 요청...');
-      
+      console.log("🤖 AI 분석 시작 요청...");
+
       // 🤖 AI 분석 시작
-      const analysisResult = await trackingService.uploadAndAnalyzeCCTV(caseId, {
-        location_name: formData.location_name,
-        incident_time: formData.incident_time,
-        suspect_description: formData.suspect_description,
-        cctv_video: formData.cctv_video
-      });
-      
+      const analysisResult = await trackingService.uploadAndAnalyzeCCTV(
+        caseId,
+        {
+          location_name: formData.location_name,
+          incident_time: formData.incident_time,
+          suspect_description: formData.suspect_description,
+          cctv_video: formData.cctv_video,
+        }
+      );
+
       if (analysisResult.success) {
         const analysisId = analysisResult.analysis_id;
-        
-        setAnalysisState(prev => ({
+
+        setAnalysisState((prev) => ({
           ...prev,
           isAnalyzing: true,
           analysisId: analysisId,
           progress: 0,
-          status: 'started',
-          statusMessage: '🤖 AI 분석 시작됨...',
-          error: null
+          status: "started",
+          statusMessage: "🤖 AI 분석 시작됨...",
+          error: null,
         }));
-        
+
         console.log(`✅ AI 분석 시작됨: ${analysisId}`);
-        
+
         // 🔄 실시간 모니터링 시작
         trackingService.monitorAnalysis(
           caseId,
@@ -259,21 +275,19 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
           handleAnalysisComplete,
           handleAnalysisError
         );
-        
       } else {
-        throw new Error(analysisResult.error || 'AI 분석 시작 실패');
+        throw new Error(analysisResult.error || "AI 분석 시작 실패");
       }
-      
     } catch (err) {
-      console.error('❌ CCTV 업로드 실패:', err);
+      console.error("❌ CCTV 업로드 실패:", err);
       alert(`CCTV 업로드 실패: ${err.message}`);
-      
-      setAnalysisState(prev => ({
+
+      setAnalysisState((prev) => ({
         ...prev,
         isAnalyzing: false,
-        status: 'error',
+        status: "error",
         statusMessage: `❌ ${err.message}`,
-        error: err.message
+        error: err.message,
       }));
     } finally {
       setLoading(false);
@@ -282,36 +296,38 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   const handleClose = () => {
     if (analysisState.isAnalyzing) {
-      const confirmClose = window.confirm('AI 분석이 진행 중입니다. 정말 닫으시겠습니까?');
+      const confirmClose = window.confirm(
+        "AI 분석이 진행 중입니다. 정말 닫으시겠습니까?"
+      );
       if (!confirmClose) return;
     }
-    
+
     // 상태 초기화
     setFormData({
-      location_name: '',
+      location_name: "",
       cctv_video: null,
-      suspect_description: '',
-      incident_time: ''
+      suspect_description: "",
+      incident_time: "",
     });
-    
+
     setAnalysisState({
       isAnalyzing: false,
       analysisId: null,
       progress: 0,
-      status: 'idle',
-      statusMessage: '',
+      status: "idle",
+      statusMessage: "",
       results: null,
-      error: null
+      error: null,
     });
-    
+
     setSearchResults([]);
     setShowSuggestions(false);
     setLoading(false);
-    
+
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
-    
+
     onClose();
   };
 
@@ -322,7 +338,7 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
       setShowSuggestions(false);
       setIsSearching(false);
       isProcessingRef.current = false;
-      
+
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -331,76 +347,113 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (inputRef.current && !inputRef.current.contains(event.target)) {
+      const isClickInsideInput =
+        inputRef.current && inputRef.current.contains(event.target);
+      const isClickInsideDropdown =
+        dropdownRef.current && dropdownRef.current.contains(event.target);
+
+      // input도 드롭다운도 아닌 곳을 클릭했을 때만 닫기
+      if (!isClickInsideInput && !isClickInsideDropdown) {
         setShowSuggestions(false);
+        console.log("🖱️ 외부 클릭으로 드롭다운 숨김");
       }
     };
 
     if (showSuggestions) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showSuggestions]);
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="🤖 AI CCTV 영상 분석" size="large">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="🤖 AI CCTV 영상 분석"
+      size="large"
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 🤖 AI 분석 상태 표시 */}
-        {(analysisState.isAnalyzing || analysisState.status === 'completed' || analysisState.status === 'error') && (
-          <div className={`p-4 rounded-lg border-2 ${
-            analysisState.status === 'completed' 
-              ? 'bg-green-50 border-green-200' 
-              : analysisState.status === 'error'
-              ? 'bg-red-50 border-red-200'
-              : 'bg-blue-50 border-blue-200'
-          }`}>
+        {(analysisState.isAnalyzing ||
+          analysisState.status === "completed" ||
+          analysisState.status === "error") && (
+          <div
+            className={`p-4 rounded-lg border-2 ${
+              analysisState.status === "completed"
+                ? "bg-green-50 border-green-200"
+                : analysisState.status === "error"
+                ? "bg-red-50 border-red-200"
+                : "bg-blue-50 border-blue-200"
+            }`}
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                {analysisState.status === 'completed' ? (
+                {analysisState.status === "completed" ? (
                   <Zap className="w-5 h-5 text-green-600" />
-                ) : analysisState.status === 'error' ? (
+                ) : analysisState.status === "error" ? (
                   <AlertCircle className="w-5 h-5 text-red-600" />
                 ) : (
                   <Zap className="w-5 h-5 text-blue-600" />
                 )}
-                <span className={`font-medium ${
-                  analysisState.status === 'completed' ? 'text-green-700' : 
-                  analysisState.status === 'error' ? 'text-red-700' : 'text-blue-700'
-                }`}>
+                <span
+                  className={`font-medium ${
+                    analysisState.status === "completed"
+                      ? "text-green-700"
+                      : analysisState.status === "error"
+                      ? "text-red-700"
+                      : "text-blue-700"
+                  }`}
+                >
                   {analysisState.statusMessage}
                 </span>
               </div>
-              <span className={`text-sm font-mono ${
-                analysisState.status === 'completed' ? 'text-green-600' : 
-                analysisState.status === 'error' ? 'text-red-600' : 'text-blue-600'
-              }`}>
+              <span
+                className={`text-sm font-mono ${
+                  analysisState.status === "completed"
+                    ? "text-green-600"
+                    : analysisState.status === "error"
+                    ? "text-red-600"
+                    : "text-blue-600"
+                }`}
+              >
                 {analysisState.progress}%
               </span>
             </div>
-            
+
             {/* 진행률 바 */}
             {analysisState.isAnalyzing && (
               <div className="w-full bg-blue-200 rounded-full h-3">
-                <div 
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out" 
+                <div
+                  className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${analysisState.progress}%` }}
                 ></div>
               </div>
             )}
-            
+
             {/* 완료 결과 표시 */}
-            {analysisState.status === 'completed' && analysisState.results && (
+            {analysisState.status === "completed" && analysisState.results && (
               <div className="mt-3 text-sm text-green-700">
-                <p>🎯 생성된 마커: <strong>{analysisState.results.markers_created}개</strong></p>
-                <p>📊 탐지된 용의자: <strong>{analysisState.results.detection_results?.total_suspects || 0}명</strong></p>
+                <p>
+                  🎯 생성된 마커:{" "}
+                  <strong>{analysisState.results.markers_created}개</strong>
+                </p>
+                <p>
+                  📊 탐지된 용의자:{" "}
+                  <strong>
+                    {analysisState.results.detection_results?.total_suspects ||
+                      0}
+                    명
+                  </strong>
+                </p>
               </div>
             )}
           </div>
@@ -425,23 +478,25 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
               autoComplete="off"
               disabled={analysisState.isAnalyzing}
             />
-            
+
             {/* 검색 중 표시 - autocomplete.css */}
             {isSearching && (
               <div className="search-loading">
                 <div className="search-spinner"></div>
               </div>
             )}
-            
+
             {/* 자동완성 드롭다운 - autocomplete.css */}
             {showSuggestions && searchResults.length > 0 && (
-              <div className="autocomplete-dropdown">
+              <div ref={dropdownRef} className="autocomplete-dropdown">
                 {searchResults.map((suggestion, index) => (
                   <div
                     key={`${suggestion.id || index}-${suggestion.place_name}`}
                     onClick={() => handleSuggestionClick(suggestion)}
                     className="autocomplete-item"
-                    style={{ pointerEvents: isProcessingRef.current ? 'none' : 'auto' }}
+                    style={{
+                      pointerEvents: isProcessingRef.current ? "none" : "auto",
+                    }}
                   >
                     <div className="autocomplete-place-name">
                       📍 {suggestion.place_name}
@@ -454,7 +509,9 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
               </div>
             )}
           </div>
-          <div className="autocomplete-hint"> {/* autocomplete.css 클래스 */}
+          <div className="autocomplete-hint">
+            {" "}
+            {/* autocomplete.css 클래스 */}
             💡 CCTV가 설치된 위치를 정확히 입력해주세요
           </div>
         </div>
@@ -496,7 +553,9 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
             <label
               htmlFor="cctv-video"
               className={`cursor-pointer text-sm text-gray-600 hover:text-blue-600 transition-colors ${
-                analysisState.isAnalyzing ? 'pointer-events-none opacity-50' : ''
+                analysisState.isAnalyzing
+                  ? "pointer-events-none opacity-50"
+                  : ""
               }`}
             >
               🎬 영상 파일 선택 (최대 500MB)
@@ -506,8 +565,13 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
             </p>
             {formData.cctv_video && (
               <div className="text-sm text-green-600 mt-3 p-3 bg-green-50 rounded-md border border-green-200">
-                <p><strong>선택된 파일:</strong> {formData.cctv_video.name}</p>
-                <p><strong>파일 크기:</strong> {formatFileSize(formData.cctv_video.size)}</p>
+                <p>
+                  <strong>선택된 파일:</strong> {formData.cctv_video.name}
+                </p>
+                <p>
+                  <strong>파일 크기:</strong>{" "}
+                  {formatFileSize(formData.cctv_video.size)}
+                </p>
               </div>
             )}
           </div>
@@ -540,12 +604,17 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             disabled={loading || analysisState.isAnalyzing}
           >
-            {analysisState.isAnalyzing ? '분석 중...' : '취소'}
+            {analysisState.isAnalyzing ? "분석 중..." : "취소"}
           </button>
           <button
             type="submit"
             className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-all"
-            disabled={loading || analysisState.isAnalyzing || !formData.cctv_video || !formData.location_name.trim()}
+            disabled={
+              loading ||
+              analysisState.isAnalyzing ||
+              !formData.cctv_video ||
+              !formData.location_name.trim()
+            }
           >
             {loading || analysisState.isAnalyzing ? (
               <>
