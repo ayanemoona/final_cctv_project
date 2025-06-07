@@ -750,3 +750,140 @@
 .space-x-3 > * + * { 
   margin-left: 0.75rem; 
 }
+
+/* 사건 카드 */
+.case-card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease-in-out;
+}
+
+.case-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.case-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+/* 제목 텍스트 자르기 - 표준 방식 사용 */
+.case-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  max-height: 2.8em; /* 2줄 높이 */
+}
+
+.case-status-badge {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.status-active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-inactive {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.case-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin-bottom: 1rem;
+}
+
+.case-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.case-detail-icon {
+  flex-shrink: 0;
+}
+
+/* 단일 줄 텍스트 자르기 - 표준 방식 */
+.case-detail-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.case-stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+}
+
+.case-stat-suspects {
+  color: #2563eb;
+}
+
+.case-stat-markers {
+  color: #16a34a;
+}
+
+/* ✅ 사건 액션 영역 (번호 + 삭제 버튼) */
+.case-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.case-number {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* ✅ 삭제 버튼 스타일 */
+.case-delete-btn {
+  padding: 0.25rem;
+  background-color: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.case-delete-btn:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+  opacity: 1;
+}
+
+.case-delete-btn:active {
+  transform: scale(0.95);
+}

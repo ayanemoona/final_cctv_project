@@ -161,13 +161,31 @@ export const casesService = {
     }
   },
 
-  // 사건 삭제
+// ✅ 사건 삭제 - 전용 엔드포인트 사용
   async deleteCase(caseId) {
     try {
-      await api.delete(`/cases/${caseId}/`);
-      return true;
+      console.log(`🗑️ 사건 삭제 요청: ${caseId}`);
+      
+      const response = await api.delete(`/cases/${caseId}/delete/`);
+      
+      console.log('✅ 사건 삭제 성공:', response.data);
+      return response.data;
     } catch (error) {
-      console.error('사건 삭제 실패:', error);
+      console.error('❌ 사건 삭제 실패:', error);
+      
+      // 상세한 에러 처리
+      if (error.response?.status === 404) {
+        throw new Error('사건을 찾을 수 없거나 삭제 권한이 없습니다.');
+      }
+      
+      if (error.response?.status === 403) {
+        throw new Error('사건 삭제 권한이 없습니다.');
+      }
+      
+      if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      }
+      
       throw new Error('사건 삭제에 실패했습니다.');
     }
   }

@@ -1,10 +1,17 @@
 // src/components/cases/CaseCard.jsx
 import React from 'react';
-import { MapPin, Clock, User } from 'lucide-react';
+import { MapPin, Clock, User, Trash2 } from 'lucide-react'; // ✅ Trash2 추가
 import { formatDate } from '../../utils/formatters.js';
 import { CASE_STATUS_LABELS } from '../../utils/constants.js';
 
-export const CaseCard = ({ case_, onSelect }) => {
+export const CaseCard = ({ case_, onSelect, onDelete }) => { // ✅ onDelete prop 추가
+  
+  // 🚨 삭제 버튼 클릭 시 이벤트 전파 방지
+  const handleDeleteClick = (e) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 방지
+    onDelete(case_.id, case_.title);
+  };
+
   return (
     <div onClick={() => onSelect(case_)} className="case-card">
       <div className="case-card-header">
@@ -42,9 +49,25 @@ export const CaseCard = ({ case_, onSelect }) => {
             📍 마커 {case_.marker_count || 0}개
           </span>
         </div>
-        <span className="case-number">
-          #{case_.case_number || case_.id}
-        </span>
+        
+        {/* ✅ 사건 액션 영역 (번호 + 삭제 버튼) */}
+        <div className="case-actions">
+          <span className="case-number">
+            #{case_.case_number || case_.id}
+          </span>
+          
+          {/* ✅ 삭제 버튼 추가 */}
+          {onDelete && (
+            <button 
+              onClick={handleDeleteClick}
+              className="case-delete-btn"
+              title={`"${case_.title}" 사건 삭제`}
+              aria-label="사건 삭제"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -386,6 +386,99 @@ def case_detail(request, case_id):
         logger.error(f"사건 상세 조회 에러: {e}")
         return JsonResponse({'error': f'서버 오류: {str(e)}'}, status=500)
 
+class CaseDeleteAPIView(APIView):
+    """사건 삭제 전용 API"""
+    
+    authentication_classes = [SimpleTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, case_id):
+        """사건 삭제 - 연관된 마커들과 파일들도 함께 삭제"""
+        try:
+            logger.info(f"🗑️ 사건 삭제 시작 - ID: {case_id}")
+            logger.info(f"👤 인증된 사용자: {request.user.username}")
+            
+            # 사건 존재 확인 및 권한 체크
+            try:
+                case = Case.objects.get(id=case_id, created_by=request.user)
+            except Case.DoesNotExist:
+                return Response({
+                    'error': '해당 사건을 찾을 수 없거나 삭제 권한이 없습니다.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            case_title = case.title
+            case_number = case.case_number
+            
+            # 연관된 데이터 개수 확인
+            markers_count = case.cctv_markers.count()
+            suspects_count = case.suspects.count()
+            
+            logger.info(f"📊 삭제 대상: 마커 {markers_count}개, 용의자 {suspects_count}명")
+            
+            # 1. 연관된 파일들 삭제
+            deleted_files = []
+            
+            # 용의자 사진 파일들 삭제
+            for suspect in case.suspects.all():
+                if suspect.reference_image_url:
+                    try:
+                        file_path = suspect.reference_image_url.lstrip('/')
+                        full_path = os.path.join(settings.BASE_DIR, file_path)
+                        if os.path.exists(full_path):
+                            os.remove(full_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"📷 용의자 사진 삭제: {file_path}")
+                    except Exception as file_error:
+                        logger.warning(f"📷 파일 삭제 실패: {file_error}")
+            
+            # 마커 크롭 이미지들 삭제
+            for marker in case.cctv_markers.all():
+                if marker.crop_image_url:
+                    try:
+                        file_path = marker.crop_image_url.lstrip('/')
+                        full_path = os.path.join(settings.BASE_DIR, file_path)
+                        if os.path.exists(full_path):
+                            os.remove(full_path)
+                            deleted_files.append(file_path)
+                            logger.info(f"📷 마커 이미지 삭제: {file_path}")
+                    except Exception as file_error:
+                        logger.warning(f"📷 파일 삭제 실패: {file_error}")
+            
+            # 2. DB에서 연관 데이터 삭제 (CASCADE로 자동 삭제되지만 명시적으로)
+            CCTVMarker.objects.filter(case=case).delete()
+            case.suspects.all().delete()
+            
+            # 3. 사건 삭제
+            case.delete()
+            
+            logger.info(f"✅ 사건 삭제 완료: {case_title} (#{case_number})")
+            logger.info(f"📁 삭제된 파일: {len(deleted_files)}개")
+            
+            return Response({
+                'success': True,
+                'message': f'사건 "{case_title}"이(가) 성공적으로 삭제되었습니다.',
+                'deleted_data': {
+                    'case_id': str(case_id),
+                    'case_title': case_title,
+                    'case_number': case_number,
+                    'markers_deleted': markers_count,
+                    'suspects_deleted': suspects_count,
+                    'files_deleted': len(deleted_files)
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"❌ 사건 삭제 실패: {e}")
+            import traceback
+            logger.error(f"스택 트레이스: {traceback.format_exc()}")
+            return Response({
+                'success': False,
+                'error': f'사건 삭제 중 오류가 발생했습니다: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 뷰 래핑
+delete_case = CaseDeleteAPIView.as_view()
+
 # 🤖 AI 관련 엔드포인트들 
 class CCTVAnalysisAPIView(APIView):
     """CCTV 영상 분석 API - DRF APIView로 통일"""
@@ -809,3 +902,4 @@ def test_cctv_connection(request, case_id):
         'method': request.method,
         'case_id': case_id
     })
+
