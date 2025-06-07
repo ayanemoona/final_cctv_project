@@ -182,7 +182,55 @@ const handleConfirmSuspect = async (selectedCandidate) => {
     console.log('🎯 용의자 확정:', selectedCandidate);
     
     // ✅ analysisResults에서 CCTV 정보 가져오기
-    const cctvInfo = analysisResults?.cctv_info || {};
+    let cctvInfo = analysisResults?.cctv_info || {};
+    console.log('📋 CCTV 정보 확인:', cctvInfo);
+
+    // ✅ 2차: localStorage에서 CCTV 정보 가져오기 (새로 추가)
+    if (!cctvInfo.location_name || !cctvInfo.incident_time) {
+      // 분석 ID로 정보 찾기
+      const analysisId = analysisResults?.analysis_id;
+      if (analysisId) {
+        const storedAnalysisInfo = localStorage.getItem(`analysis_${analysisId}`);
+        if (storedAnalysisInfo) {
+          const parsedInfo = JSON.parse(storedAnalysisInfo);
+          cctvInfo = {
+            location_name: parsedInfo.location_name,
+            incident_time: parsedInfo.incident_time,
+            officer_name: parsedInfo.officer_name || '',
+            case_number: parsedInfo.caseId || currentCase.id
+          };
+          console.log('💾 localStorage에서 복원된 CCTV 정보:', cctvInfo);
+        }
+      }
+      
+      // 3차: 케이스 ID로 정보 찾기
+      if (!cctvInfo.location_name) {
+        const storedCctvInfo = localStorage.getItem(`cctv_upload_${currentCase.id}`);
+        if (storedCctvInfo) {
+          const parsedInfo = JSON.parse(storedCctvInfo);
+          cctvInfo = {
+            location_name: parsedInfo.location_name,
+            incident_time: parsedInfo.incident_time,
+            officer_name: '',
+            case_number: currentCase.id
+          };
+          console.log('💾 케이스 ID로 복원된 CCTV 정보:', cctvInfo);
+        }
+      }
+    }
+    
+    // ✅ 최종 검증
+    if (!cctvInfo.location_name) {
+      console.warn('⚠️ CCTV 위치 정보 없음 - 기본값 사용');
+      cctvInfo.location_name = '분석 완료 지점';
+    }
+    
+    if (!cctvInfo.incident_time) {
+      console.warn('⚠️ CCTV 시간 정보 없음 - 현재 시간 사용');
+      cctvInfo.incident_time = new Date().toISOString();
+    }
+    
+    console.log('✅ 최종 사용할 CCTV 정보:', cctvInfo);
     
     // ✅ CCTV 업로드시 입력한 위치와 시간으로 마커 1개만 생성
     const markerData = {
@@ -209,6 +257,14 @@ const handleConfirmSuspect = async (selectedCandidate) => {
     const newMarker = await trackingService.addMarker(currentCase.id, markerData);
     
     console.log('✅ 마커 생성 완료:', newMarker);
+
+    // ✅ localStorage 정리 (선택사항)
+    const analysisId = analysisResults?.analysis_id;
+    if (analysisId) {
+      localStorage.removeItem(`analysis_${analysisId}`);
+      localStorage.removeItem(`cctv_upload_${currentCase.id}`);
+      console.log('🗑️ localStorage 정리 완료');
+    }
     
     // 마커 목록 새로고침
     await loadMarkers();
@@ -330,6 +386,7 @@ const handleCreateExcludedMarker = async (excludeData) => {
           markers={markers}
           selectedMarkerId={selectedMarkerId}
           progress={progress}
+          onMarkerSelect={setSelectedMarkerId}
         />
       </div>
 

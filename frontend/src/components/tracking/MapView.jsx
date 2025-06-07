@@ -2,7 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../styles/kakaoMap.css";
 
-export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect }) => {
+export const MapView = ({
+  markers,
+  selectedMarkerId,
+  progress,
+  onMarkerSelect,
+}) => {
   const mapRef = useRef(null); // HTML div 참조
   const mapObjRef = useRef(null); // 카카오 지도 객체 참조
   const kakaoMarkers = useRef([]); // 지도 마커들
@@ -21,10 +26,11 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
   // 카카오맵 SDK 로딩 및 초기화
   useEffect(() => {
     console.log("🚀 MapView 컴포넌트 마운트됨");
-    
+
     // ✅ Vite 환경변수 사용
-    const KAKAO_MAP_API_KEY = import.meta.env.VITE_KAKAO_MAP_API_KEY || 'YOUR_KAKAO_MAP_API_KEY';
-    console.log("🔑 API 키:", KAKAO_MAP_API_KEY ? '설정됨' : '미설정');
+    const KAKAO_MAP_API_KEY =
+      import.meta.env.VITE_KAKAO_MAP_API_KEY || "YOUR_KAKAO_MAP_API_KEY";
+    console.log("🔑 API 키:", KAKAO_MAP_API_KEY ? "설정됨" : "미설정");
 
     const script = document.createElement("script");
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_API_KEY}&autoload=false&libraries=services`;
@@ -46,7 +52,7 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
 
           if (mapRef.current) {
             const options = {
-              center: new window.kakao.maps.LatLng(37.5665, 126.9780), // 서울시청
+              center: new window.kakao.maps.LatLng(37.5665, 126.978), // 서울시청
               level: 3,
             };
 
@@ -126,7 +132,9 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
       polyline.current.setMap(mapObjRef.current);
     }
 
-    console.log(`🔗 경로선 그리기 완료: ${sortedPositions.length}개 지점 (화살표 없음)`);
+    console.log(
+      `🔗 경로선 그리기 완료: ${sortedPositions.length}개 지점 (화살표 없음)`
+    );
   };
 
   // 경로 토글 함수
@@ -147,7 +155,8 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
       const marker = markers[index];
       if (!marker) return;
 
-      const markerClass = marker.is_confirmed && !marker.is_excluded ? "confirmed" : "excluded";
+      const markerClass =
+        marker.is_confirmed && !marker.is_excluded ? "confirmed" : "excluded";
       const selectedClass = selectedMarkerId === marker.id ? "selected" : "";
 
       const content = `
@@ -169,7 +178,7 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
 
     // 마커가 없으면 서울시청 중심으로 설정
     if (markers.length === 0) {
-      const center = new window.kakao.maps.LatLng(37.5665, 126.9780);
+      const center = new window.kakao.maps.LatLng(37.5665, 126.978);
       mapObjRef.current.setCenter(center);
       mapObjRef.current.setLevel(3);
       console.log("📍 마커가 없음 - 서울시청 중심으로 설정");
@@ -199,7 +208,7 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
         순서: idx + 1,
         location: m.location_name,
         datetime: new Date(m.detected_at).toLocaleString("ko-KR"),
-        sequence_order: m.sequence_order || 0
+        sequence_order: m.sequence_order || 0,
       }))
     );
 
@@ -214,7 +223,8 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
       });
 
       // ✅ 마커 번호 오버레이 (선택 상태에 따라 스타일 변경)
-      const markerClass = marker.is_confirmed && !marker.is_excluded ? "confirmed" : "excluded";
+      const markerClass =
+        marker.is_confirmed && !marker.is_excluded ? "confirmed" : "excluded";
       const selectedClass = selectedMarkerId === marker.id ? "selected" : "";
 
       console.log(`🎯 마커 ${sortedIndex + 1} 상태:`, {
@@ -243,13 +253,20 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
       // ✅ 마커 클릭 시 단일 선택 처리
       window.kakao.maps.event.addListener(kakaoMarker, "click", () => {
         console.log(`🖱️ 마커 ${sortedIndex + 1} 클릭됨 (ID: ${marker.id})`);
-        
-        // 부모 컴포넌트에 선택된 마커 ID 전달
+        console.log(`🔍 클릭된 마커 정보:`, {
+          마커번호: sortedIndex + 1,
+          ID: marker.id,
+          위치: marker.location_name,
+          시간: marker.detected_at,
+          현재선택됨: selectedMarkerId === marker.id,
+        });
+
+        // ✅ 부모 컴포넌트에 선택된 마커 ID 전달
         if (onMarkerSelect) {
-          // 이미 선택된 마커를 다시 클릭하면 선택 해제
-          const newSelectedId = selectedMarkerId === marker.id ? null : marker.id;
-          onMarkerSelect(newSelectedId);
-          console.log(`🎯 마커 선택 변경: ${newSelectedId ? `마커 ${sortedIndex + 1} 선택` : '선택 해제'}`);
+          console.log(`📤 부모에게 마커 선택 전달: ${marker.id}`);
+          onMarkerSelect(marker.id); // 항상 해당 마커 선택
+        } else {
+          console.warn(`⚠️ onMarkerSelect 함수가 없습니다!`);
         }
       });
 
@@ -258,7 +275,9 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
         content: `
           <div class="marker-info">
             <div class="marker-info-title">
-              📍 ${sortedIndex + 1}번: ${marker.location_name || "위치 정보 없음"}
+              📍 ${sortedIndex + 1}번: ${
+          marker.location_name || "위치 정보 없음"
+        }
             </div>
             <div class="marker-info-time">
               🕐 ${
@@ -301,14 +320,14 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
     // ✅ 순서 보장된 마커 처리 함수
     const processMarkersInOrder = async () => {
       const processedMarkers = [];
-      
+
       for (let i = 0; i < sortedMarkers.length; i++) {
         const marker = sortedMarkers[i];
         const sortedIndex = i;
-        
+
         try {
           let lat, lng;
-          
+
           if (marker.latitude && marker.longitude) {
             // 저장된 좌표 사용
             lat = marker.latitude;
@@ -320,46 +339,47 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
             // ✅ 주소를 Promise로 변환하여 순서 보장
             const coords = await new Promise((resolve) => {
               const geocoder = new window.kakao.maps.services.Geocoder();
-              
+
               geocoder.addressSearch(marker.location_name, (result, status) => {
                 if (status === window.kakao.maps.services.Status.OK) {
                   resolve({
                     lat: parseFloat(result[0].y),
-                    lng: parseFloat(result[0].x)
+                    lng: parseFloat(result[0].x),
                   });
                 } else {
                   // 주소 변환 실패 시 기본 좌표
                   resolve({
                     lat: 37.5665 + (Math.random() - 0.5) * 0.02,
-                    lng: 126.9780 + (Math.random() - 0.5) * 0.02
+                    lng: 126.978 + (Math.random() - 0.5) * 0.02,
                   });
                 }
               });
             });
-            
+
             lat = coords.lat;
             lng = coords.lng;
             console.log(
-              `📍 마커 ${sortedIndex + 1}: 주소 변환 (${marker.location_name}) → (${lat}, ${lng})`
+              `📍 마커 ${sortedIndex + 1}: 주소 변환 (${
+                marker.location_name
+              }) → (${lat}, ${lng})`
             );
           }
-          
+
           // ✅ 순서대로 마커 생성
           createMarkerOnMap(marker, sortedIndex, lat, lng);
           processedMarkers.push({ marker, lat, lng, index: sortedIndex });
-          
         } catch (error) {
           console.error(`❌ 마커 ${sortedIndex + 1} 처리 실패:`, error);
         }
       }
-      
+
       return processedMarkers;
     };
 
     // ✅ 순서대로 처리 실행
     processMarkersInOrder().then((processedMarkers) => {
       console.log(`✅ 마커 순서대로 처리 완료: ${processedMarkers.length}개`);
-      
+
       // ✅ 화살표 없이 경로선만 그리기
       setTimeout(() => {
         if (sortedPositions.length > 1) {
@@ -371,17 +391,20 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
           mapObjRef.current.setBounds(bounds);
         }
 
-        console.log(`📍 순서 보장된 마커 ${sortedMarkers.length}개 표시 완료 (화살표 제거됨)`);
+        console.log(
+          `📍 순서 보장된 마커 ${sortedMarkers.length}개 표시 완료 (화살표 제거됨)`
+        );
       }, 300);
     });
-
   }, [mapReady, markers, showPath]);
 
   // ✅ selectedMarkerId 변경 시 오버레이 업데이트
   useEffect(() => {
     if (mapReady && overlays.current.length > 0) {
       updateMarkerOverlays();
-      console.log(`🎯 마커 선택 상태 업데이트: ${selectedMarkerId || '선택 없음'}`);
+      console.log(
+        `🎯 마커 선택 상태 업데이트: ${selectedMarkerId || "선택 없음"}`
+      );
     }
   }, [selectedMarkerId]);
 
@@ -392,16 +415,14 @@ export const MapView = ({ markers, selectedMarkerId, progress, onMarkerSelect })
 
       {/* ✅ 경로 컨트롤 패널 */}
       <div className="path-controls">
-        <button 
-          className={`path-toggle-btn ${showPath ? 'active' : ''}`}
+        <button
+          className={`path-toggle-btn ${showPath ? "active" : ""}`}
           onClick={togglePath}
           title="경로선 표시/숨기기"
         >
-          {showPath ? '🔗 경로 숨기기' : '📍 경로 보기'}
+          {showPath ? "🔗 경로 숨기기" : "📍 경로 보기"}
         </button>
-        <div className="path-info">
-          총 {markers?.length || 0}개 마커
-        </div>
+        <div className="path-info">총 {markers?.length || 0}개 마커</div>
       </div>
 
       {/* 지도 컨트롤 버튼 */}

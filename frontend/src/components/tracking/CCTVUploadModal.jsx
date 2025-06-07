@@ -95,19 +95,18 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
     }
   };
 
-  const handleSuggestionClick = (suggestion) => {
+  // 자동완성 드롭다운 클릭 핸들러 개선 (e.preventDefault, e.stopPropagation)
+  const handleSuggestionClick = (suggestion, event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     if (isProcessingRef.current) return;
-
     isProcessingRef.current = true;
-    const selectedAddress =
-      suggestion.road_address_name || suggestion.place_name;
-
+    const selectedAddress = suggestion.road_address_name || suggestion.place_name;
     setFormData((prev) => ({ ...prev, location_name: selectedAddress }));
     setShowSuggestions(false);
     setSearchResults([]);
-
-    console.log("📍 CCTV 위치 선택 완료:", selectedAddress);
-
     setTimeout(() => {
       isProcessingRef.current = false;
     }, 100);
@@ -212,12 +211,14 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
       // ✅ 2초 후 모달 닫기
       setTimeout(() => {
-        handleClose();
+        resetAllState();
+        onClose();
       }, 2000);
     } else {
       // 용의자를 찾지 못한 경우
       alert("분석이 완료되었지만 용의자 후보를 찾지 못했습니다.");
-      handleClose();
+      resetAllState();
+      onClose();
     }
   };
 
@@ -232,6 +233,8 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
     console.error("❌ AI 분석 에러:", error);
     alert(`분석 실패: ${error.message}`);
+    resetAllState();
+    onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -258,6 +261,18 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
     try {
       console.log("🤖 AI 분석 시작 요청...");
 
+      // ✅ CCTV 업로드 정보를 localStorage에 저장 (새로 추가)
+    const cctvUploadInfo = {
+      location_name: formData.location_name,
+      incident_time: formData.incident_time,
+      suspect_description: formData.suspect_description,
+      timestamp: new Date().toISOString(), // 업로드 시간
+      caseId: caseId
+    };
+    
+    localStorage.setItem(`cctv_upload_${caseId}`, JSON.stringify(cctvUploadInfo));
+    console.log("💾 CCTV 업로드 정보 저장됨:", cctvUploadInfo);
+
       // 🤖 AI 분석 시작
       const analysisResult = await trackingService.uploadAndAnalyzeCCTV(
         caseId,
@@ -271,6 +286,14 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
       if (analysisResult.success) {
         const analysisId = analysisResult.analysis_id;
+
+        // ✅ 분석 ID와 함께 CCTV 정보도 저장 (새로 추가)
+      const analysisInfo = {
+        ...cctvUploadInfo,
+        analysis_id: analysisId
+      };
+      localStorage.setItem(`analysis_${analysisId}`, JSON.stringify(analysisInfo));
+      console.log("💾 분석 정보 저장됨:", analysisInfo);
 
         setAnalysisState((prev) => ({
           ...prev,
@@ -311,22 +334,14 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
     }
   };
 
-  const handleClose = () => {
-    if (analysisState.isAnalyzing) {
-      const confirmClose = window.confirm(
-        "AI 분석이 진행 중입니다. 정말 닫으시겠습니까?"
-      );
-      if (!confirmClose) return;
-    }
-
-    // 상태 초기화
+  // 모달 닫힘/분석 완료/에러 시 상태 완전 초기화
+  const resetAllState = () => {
     setFormData({
       location_name: "",
       cctv_video: null,
       suspect_description: "",
       incident_time: "",
     });
-
     setAnalysisState({
       isAnalyzing: false,
       analysisId: null,
@@ -336,15 +351,21 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
       results: null,
       error: null,
     });
-
     setSearchResults([]);
     setShowSuggestions(false);
-    setLoading(false);
-
+    setIsSearching(false);
+    isProcessingRef.current = false;
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
 
+  const handleClose = () => {
+    if (analysisState.isAnalyzing) return;
+    resetAllState();
     onClose();
   };
 
@@ -364,22 +385,15 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      const isClickInsideInput =
-        inputRef.current && inputRef.current.contains(event.target);
-      const isClickInsideDropdown =
-        dropdownRef.current && dropdownRef.current.contains(event.target);
-
-      // input도 드롭다운도 아닌 곳을 클릭했을 때만 닫기
+      const isClickInsideInput = inputRef.current && inputRef.current.contains(event.target);
+      const isClickInsideDropdown = dropdownRef.current && dropdownRef.current.contains(event.target);
       if (!isClickInsideInput && !isClickInsideDropdown) {
         setShowSuggestions(false);
-        console.log("🖱️ 외부 클릭으로 드롭다운 숨김");
       }
     };
-
     if (showSuggestions) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showSuggestions]);
 
@@ -509,18 +523,12 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
                 {searchResults.map((suggestion, index) => (
                   <div
                     key={`${suggestion.id || index}-${suggestion.place_name}`}
-                    onClick={() => handleSuggestionClick(suggestion)}
+                    onClick={(e) => handleSuggestionClick(suggestion, e)}
                     className="autocomplete-item"
-                    style={{
-                      pointerEvents: isProcessingRef.current ? "none" : "auto",
-                    }}
+                    style={{ pointerEvents: isProcessingRef.current ? "none" : "auto" }}
                   >
-                    <div className="autocomplete-place-name">
-                      📍 {suggestion.place_name}
-                    </div>
-                    <div className="autocomplete-address">
-                      🏠 {suggestion.road_address_name}
-                    </div>
+                    <div className="autocomplete-place-name">📍 {suggestion.place_name}</div>
+                    <div className="autocomplete-address">🏠 {suggestion.road_address_name}</div>
                   </div>
                 ))}
               </div>

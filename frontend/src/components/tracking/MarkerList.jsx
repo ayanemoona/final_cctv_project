@@ -1,4 +1,4 @@
-// src/components/tracking/MarkerList.jsx - 하드코딩 제거 버전
+// src/components/tracking/MarkerList.jsx - 시간순 정렬 적용
 import React from 'react';
 import { formatTime, formatConfidence } from '../../utils/formatters.js';
 
@@ -10,6 +10,26 @@ export const MarkerList = ({
   onShowUploadModal, 
   onShowManualModal 
 }) => {
+  // ✅ 시간순으로 정렬된 마커 생성
+  const sortedMarkers = [...markers].sort((a, b) => {
+    const dateA = new Date(a.detected_at);
+    const dateB = new Date(b.detected_at);
+    
+    // 1차: 시간순 정렬
+    if (dateA.getTime() !== dateB.getTime()) {
+      return dateA.getTime() - dateB.getTime();
+    }
+    
+    // 2차: 같은 시간이면 sequence_order 순
+    return (a.sequence_order || 0) - (b.sequence_order || 0);
+  });
+
+  console.log('📋 MarkerList 시간순 정렬:', sortedMarkers.map((m, idx) => ({
+    순서: idx + 1,
+    시간: new Date(m.detected_at).toLocaleString('ko-KR'),
+    위치: m.location_name
+  })));
+
   return (
     <div className="sidebar">
       {/* 사건 정보 */}
@@ -70,18 +90,21 @@ export const MarkerList = ({
         </button>
       </div>
 
-      {/* 마커 리스트 */}
+      {/* 마커 리스트 - ✅ 시간순 정렬 적용 */}
       <div className="markers-container">
         <div className="markers-header">
           이동 경로 (시간순) ({markers.length}개)
         </div>
         
-        {markers.map(marker => (
+        {sortedMarkers.map((marker, index) => (
           <div
             key={marker.id}
             onClick={() => onSelectMarker(marker.id)}
             className={`marker-item ${selectedMarkerId === marker.id ? 'selected' : ''}`}
           >
+            {/* ✅ 시간순 기준 번호 표시 */}
+            <div className="marker-number">{index + 1}</div>
+            
             <div className="marker-time">
               {formatTime(marker.detected_at) || marker.timestamp}
             </div>
