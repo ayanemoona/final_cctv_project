@@ -1,12 +1,14 @@
 # backend/apps/authentication/views.py - Token import 수정
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 import uuid  # 임시 토큰 생성용
 from .models import PoliceUser
+from .authentication import SimpleTokenAuthentication
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -86,3 +88,18 @@ def verify_token(request):
             {'valid': False, 'error': '유효하지 않은 토큰입니다.'}, 
             status=status.HTTP_401_UNAUTHORIZED
         )
+    
+@api_view(['GET'])
+@authentication_classes([SimpleTokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_current_user(request):
+    """현재 로그인한 사용자 정보"""
+    return Response({
+        'user': {
+            'id': request.user.id,
+            'username': request.user.username,
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+            'is_authenticated': True
+        }
+    })

@@ -76,7 +76,7 @@ export const trackingService = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // 1분 타임아웃 (분석 시작용)
+        timeout: 300000, // 1분 타임아웃 (분석 시작용)
       });
       
       console.log('✅ CCTV 분석 시작 성공:', response.data);

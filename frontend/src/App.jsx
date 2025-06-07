@@ -1,5 +1,6 @@
-// src/App.jsx
-import React, { useState } from 'react';
+// src/App.jsx - React Router 적용 버전
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { CaseTrackingPage } from './pages/CaseTrackingPage.jsx';
@@ -14,21 +15,10 @@ import './styles/typography.css';
 import './styles/components.css';
 import './styles/tracking.css';
 
-function App() {
-  const { user, loading, isAuthenticated, login, logout } = useAuth();
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [selectedCase, setSelectedCase] = useState(null);
-
-  const handleSelectCase = (case_) => {
-    setSelectedCase(case_);
-    setCurrentView('tracking');
-  };
-
-  const handleBackToDashboard = () => {
-    setSelectedCase(null);
-    setCurrentView('dashboard');
-  };
-
+// 보호된 라우트 컴포넌트
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -36,27 +26,72 @@ function App() {
       </div>
     );
   }
+  
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
 
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={login} />;
-  }
-
-  if (currentView === 'tracking' && selectedCase) {
-    return (
-      <CaseTrackingPage 
-        case_={selectedCase}
-        user={user}
-        onBack={handleBackToDashboard}
-      />
-    );
-  }
-
+// 케이스 추적 페이지 래퍼
+const CaseTrackingWrapper = () => {
+  const { user, logout } = useAuth();
+  
   return (
-    <DashboardPage 
-      user={user}
-      onLogout={logout}
-      onSelectCase={handleSelectCase}
-    />
+    <ProtectedRoute>
+      <CaseTrackingPage 
+        user={user}
+        onLogout={logout}
+      />
+    </ProtectedRoute>
+  );
+};
+
+// 대시보드 페이지 래퍼
+const DashboardWrapper = () => {
+  const { user, logout } = useAuth();
+  
+  return (
+    <ProtectedRoute>
+      <DashboardPage 
+        user={user}
+        onLogout={logout}
+      />
+    </ProtectedRoute>
+  );
+};
+
+// 로그인 페이지 래퍼
+const LoginWrapper = () => {
+  const { login, isAuthenticated } = useAuth();
+  
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return <LoginPage onLogin={login} />;
+};
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        {/* 로그인 페이지 */}
+        <Route path="/login" element={<LoginWrapper />} />
+        
+        {/* 대시보드 (메인 페이지) */}
+        <Route path="/dashboard" element={<DashboardWrapper />} />
+        
+        {/* 케이스 추적 페이지 */}
+        <Route path="/case/:caseId" element={<CaseTrackingWrapper />} />
+        
+        {/* 분석 결과 페이지 (케이스 추적과 동일) */}
+        <Route path="/case/:caseId/analysis/:analysisId" element={<CaseTrackingWrapper />} />
+        
+        {/* 기본 라우트 - 대시보드로 리다이렉트 */}
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+        
+        {/* 404 페이지 */}
+        <Route path="*" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </Router>
   );
 }
 

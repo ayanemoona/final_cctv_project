@@ -8,6 +8,7 @@ const API_BASE_URL = 'http://localhost:8000/api';
 export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  timeout: 300000, // ✅ 5분 타임아웃 추가 (300초 = 300,000ms)
 });
 
 // 요청 인터셉터 - 인증 토큰 자동 추가
@@ -86,6 +87,7 @@ export const apiHelpers = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 600000,
       onUploadProgress,
     });
   },

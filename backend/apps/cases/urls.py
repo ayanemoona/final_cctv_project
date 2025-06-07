@@ -20,4 +20,7 @@ urlpatterns = [
     
     # 🤖 AI 서비스 상태 확인
     path('ai/health/', views.ai_health_check, name='ai_health'),  # GET /api/cases/ai/health/
+
+     # 🧪 테스트용
+    path('<uuid:case_id>/cctv/test/', views.test_cctv_connection, name='test_cctv'),
 ]

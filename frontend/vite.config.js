@@ -15,6 +15,20 @@ export default defineConfig({
     },
     hmr: {
       port: 3000
+    },
+    // ✅ 프록시 설정 추가 (API 요청을 Django로 전달)
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
+      },
+      '/health': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false
+      }
     }
   },
 

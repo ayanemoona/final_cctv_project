@@ -13,6 +13,8 @@ import logging
 from datetime import datetime
 import uuid
 import os
+import requests
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -384,28 +386,426 @@ def case_detail(request, case_id):
         logger.error(f"사건 상세 조회 에러: {e}")
         return JsonResponse({'error': f'서버 오류: {str(e)}'}, status=500)
 
-# 🤖 AI 관련 엔드포인트들 (미구현)
-@csrf_exempt
-def analyze_cctv_video(request, case_id):
-    """CCTV 영상 업로드 및 AI 분석 (미구현)"""
-    return JsonResponse({'error': 'AI 분석 기능은 아직 구현되지 않았습니다'}, status=501)
+# 🤖 AI 관련 엔드포인트들 
+class CCTVAnalysisAPIView(APIView):
+    """CCTV 영상 분석 API - DRF APIView로 통일"""
+    
+    authentication_classes = [SimpleTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, case_id):
+        """CCTV 영상 업로드 및 AI 분석 (사건별 용의자 매칭)"""
+        try:
+            logger.info(f"🎯 CCTV 분석 시작 - 사건: {case_id}")
+            logger.info(f"👤 인증된 사용자: {request.user.username}")
+            
+            # 1. 사건 및 용의자 정보 확인
+            try:
+                case = Case.objects.get(id=case_id, created_by=request.user)
+            except Case.DoesNotExist:
+                return Response({
+                    'error': '해당 사건을 찾을 수 없거나 접근 권한이 없습니다.'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            first_suspect = case.suspects.first()
+            
+            if not first_suspect or not first_suspect.reference_image_url:
+                return Response({
+                    'error': '이 사건에 등록된 용의자 사진이 없습니다. 먼저 사건에 용의자 사진을 등록해주세요.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 2. 업로드된 데이터 받기
+            location_name = request.data.get('location_name')
+            incident_time = request.data.get('incident_time')
+            suspect_description = request.data.get('suspect_description', '')
+            cctv_video = request.FILES.get('cctv_video')
+            
+            if not cctv_video:
+                return Response({
+                    'error': 'CCTV 영상 파일이 필요합니다'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            logger.info(f"📁 파일 수신: {cctv_video.name}, 크기: {cctv_video.size/1024/1024:.2f}MB")
+            logger.info(f"👤 대상 용의자: {first_suspect.ai_person_id}")
+            
+            # 3. 해당 사건의 용의자를 Clothing Service에 임시 등록
+            suspect_image_path = first_suspect.reference_image_url.lstrip('/')
+            full_image_path = os.path.join(settings.BASE_DIR, suspect_image_path)
+            
+            if not os.path.exists(full_image_path):
+                return Response({
+                    'error': f'용의자 사진 파일을 찾을 수 없습니다: {suspect_image_path}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 4. Clothing Service에 이 사건의 용의자만 등록
+            try:
+                with open(full_image_path, 'rb') as f:
+                    image_data = f.read()
+                
+                files = {'file': (f'{first_suspect.ai_person_id}.jpg', image_data, 'image/jpeg')}
+                data = {'person_id': first_suspect.ai_person_id}
+                
+                response = requests.post(
+                    'http://clothing-service:8002/register_person',
+                    files=files,
+                    data=data,
+                    timeout=30
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"용의자 등록 실패: {response.status_code} - {response.text}")
+                    return Response({
+                        'error': f'용의자 등록 실패: {response.status_code}'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                logger.info(f"✅ 용의자 등록 완료: {first_suspect.ai_person_id}")
+                
+            except Exception as reg_error:
+                logger.error(f"용의자 등록 오류: {reg_error}")
+                return Response({
+                    'error': f'용의자 등록 오류: {reg_error}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # 5. AI Gateway로 CCTV 분석 요청
+            gateway_url = os.getenv('AI_GATEWAY_URL', 'http://api-gateway:8000')
+            
+            files = {'video_file': (cctv_video.name, cctv_video.read(), cctv_video.content_type)}
+            data = {
+                'location': location_name,
+                'date': incident_time,
+                'officer_name': request.user.username,
+                'case_number': str(case_id),
+                'stop_on_detect': True
+            }
+            
+            logger.info(f"📤 AI 요청 데이터: {data}")
+            
+            response = requests.post(
+                f"{gateway_url}/police/analyze_cctv",
+                files=files,
+                data=data,
+                timeout=60
+            )
+            
+            logger.info(f"📨 AI 응답: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"✅ AI 분석 성공: {result}")
+                return Response({
+                    'success': True,
+                    'analysis_id': result.get('analysis_id'),
+                    'case_id': result.get('case_id', str(case_id)),
+                    'suspect_id': first_suspect.ai_person_id,
+                    'message': f'사건 {case.case_number}의 용의자와 매칭 분석이 시작되었습니다'
+                }, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"❌ AI 서비스 오류: {response.status_code} - {response.text}")
+                return Response({
+                    'success': False,
+                    'error': f'AI 서비스 오류: {response.status_code}',
+                    'details': response.text
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"❌ CCTV 분석 실패: {e}")
+            import traceback
+            logger.error(f"스택 트레이스: {traceback.format_exc()}")
+            return Response({
+                'success': False, 
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 기존 함수 제거하고 뷰 래핑 추가
+analyze_cctv_video = CCTVAnalysisAPIView.as_view()
 
 @csrf_exempt
 def get_analysis_status(request, case_id, analysis_id):
-    """AI 분석 진행 상황 조회 (미구현)"""
-    return JsonResponse({'error': 'AI 분석 상태 조회 기능은 아직 구현되지 않았습니다'}, status=501)
+    """AI 분석 진행상황 조회 - 수정된 버전"""
+    try:
+        video_service_url = os.getenv('VIDEO_SERVICE_URL', 'http://video-service:8004')  
+        
+        # ✅ Video Service 직접 호출 (Django Shell에서 성공한 방식과 동일)
+        response = requests.get(
+            f"{video_service_url}/analysis_status/{analysis_id}",
+            timeout=300 # 30초 → 10초로 단축 (Shell에서 1초도 안 걸림)
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # ✅ Video Service의 실제 응답 형식 그대로 사용
+            return JsonResponse({
+                'success': True,
+                'analysis_id': result.get('analysis_id', analysis_id),
+                'status': result.get('status', 'processing'),
+                'progress': result.get('progress', 0),
+                'current_phase': result.get('current_phase', ''),
+                'method': result.get('method', ''),
+                'suspects_found': result.get('suspects_found', 0),
+                'crop_images_available': result.get('crop_images_available', 0),
+                'processing_time': result.get('processing_time', 0),
+                'optimization_stats': result.get('optimization_stats', {}),
+                'high_confidence_mode': result.get('high_confidence_mode', False),
+                'phase_description': result.get('phase_description', '')
+            })
+        else:
+            logger.error(f"Video Service 상태 조회 실패: {response.status_code} - {response.text}")
+            return JsonResponse({
+                'success': False,
+                'error': f'상태 조회 실패: {response.status_code}',
+                'details': response.text
+            }, status=response.status_code)
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"Video Service 타임아웃: analysis_id={analysis_id}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Video Service 응답 타임아웃',
+            'message': '분석 서비스가 응답하지 않습니다. 잠시 후 다시 시도해주세요.'
+        }, status=408)
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Video Service 연결 실패: analysis_id={analysis_id}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Video Service 연결 실패',
+            'message': '분석 서비스에 연결할 수 없습니다.'
+        }, status=503)
+    except Exception as e:
+        logger.error(f"분석 상태 조회 실패: analysis_id={analysis_id}, error={e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 @csrf_exempt
 def get_analysis_results(request, case_id, analysis_id):
-    """AI 분석 완료 결과 조회 (미구현)"""
-    return JsonResponse({'error': 'AI 분석 결과 조회 기능은 아직 구현되지 않았습니다'}, status=501)
+    """AI 분석 완료 결과 조회 + CCTV 정보 포함"""
+    try:
+        video_service_url = os.getenv('VIDEO_SERVICE_URL', 'http://video-service:8004')
+        
+        # ✅ 1. 사건 정보 먼저 조회 (CCTV 정보 포함)
+        try:
+            case = Case.objects.get(id=case_id)
+        except Case.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': '사건을 찾을 수 없습니다'
+            }, status=404)
+        
+        # ✅ 2. Video Service에서 분석 결과 조회
+        response = requests.get(
+            f"{video_service_url}/analysis_result/{analysis_id}",
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # 분석이 완료되었는지 확인
+            if result.get('status') != 'completed':
+                return JsonResponse({
+                    'success': False,
+                    'status': 'incomplete',
+                    'message': result.get('message', '분석 진행 중'),
+                    'progress': result.get('progress', 0)
+                })
+            
+            # 크롭 이미지들 추출
+            crop_images = result.get('suspect_crop_images', [])
+            timeline_data = result.get('suspects_timeline', [])
+            
+            # 🎯 경찰이 선택할 수 있는 형태로 변환
+            detection_candidates = []
+            for i, crop_img in enumerate(crop_images):
+                detection_candidates.append({
+                    'detection_id': f"detection_{i+1}",
+                    'suspect_id': crop_img.get('suspect_id', f'suspect_{i+1}'),
+                    'similarity': crop_img.get('similarity', 0),
+                    'similarity_percentage': f"{crop_img.get('similarity', 0) * 100:.1f}%",
+                    'cropped_image_base64': crop_img.get('cropped_image', ''),
+                    'timestamp': crop_img.get('timestamp', ''),
+                    'bbox': crop_img.get('bbox', {}),
+                    'person_id': crop_img.get('person_id', ''),
+                    'total_appearances': crop_img.get('total_appearances', 1),
+                    'crop_quality': crop_img.get('crop_quality', 0),
+                    'confidence_level': 'HIGH' if crop_img.get('similarity', 0) > 0.8 else 'MEDIUM'
+                })
+            
+            # ✅ 3. 원본 CCTV 분석 요청 정보 추가 (Video Service에서 받은 정보 활용)
+            original_request = result.get('original_request', {})
+            
+            return JsonResponse({
+                'success': True,
+                'status': 'completed',
+                'analysis_id': result.get('analysis_id', analysis_id),
+                'detection_candidates': detection_candidates,
+                'total_detections': len(detection_candidates),
+                'timeline_data': timeline_data,
+                'processing_time': result.get('processing_time_seconds', 0),
+                
+                # ✅ 원본 CCTV 정보 포함
+                'cctv_info': {
+                    'location_name': original_request.get('location', '알 수 없는 위치'),
+                    'incident_time': original_request.get('date', ''),
+                    'officer_name': original_request.get('officer_name', ''),
+                    'case_number': original_request.get('case_number', str(case_id)),
+                    'analysis_method': result.get('method', 'standard')
+                },
+                
+                # ✅ 사건 정보 추가
+                'case_info': {
+                    'id': str(case.id),
+                    'case_number': case.case_number,
+                    'title': case.title,
+                    'location': case.location
+                },
+                
+                'analysis_summary': result.get('summary', {}),
+                'performance_stats': result.get('performance_stats', {}),
+                'message': f'{len(detection_candidates)}개의 용의자 후보가 발견되었습니다'
+            })
+            
+        elif response.status_code == 400:
+            return JsonResponse({
+                'success': False,
+                'status': 'incomplete',
+                'message': '분석이 아직 완료되지 않았습니다'
+            })
+        else:
+            logger.error(f"Video Service 결과 조회 실패: {response.status_code} - {response.text}")
+            return JsonResponse({
+                'success': False,
+                'error': f'결과 조회 실패: {response.status_code}',
+                'details': response.text
+            }, status=response.status_code)
+            
+    except Exception as e:
+        logger.error(f"분석 결과 조회 실패: analysis_id={analysis_id}, error={e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 @csrf_exempt
+def get_analysis_results(request, case_id, analysis_id):
+    """AI 분석 완료 결과 조회 + 마커 생성"""
+    try:
+        video_service_url = os.getenv('VIDEO_SERVICE_URL', 'http://video-service:8004')
+        
+        # AI Gateway의 case_report 엔드포인트 호출
+        response = requests.get(
+            f"{video_service_url}/analysis_result/{analysis_id}",
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # 분석이 완료되었는지 확인
+            if result.get('status') == 'incomplete':
+                return JsonResponse({
+                    'success': False,
+                    'status': 'incomplete',
+                    'message': result.get('message', '분석 진행 중'),
+                    'progress': result.get('current_progress', 0)
+                })
+            
+            # 크롭 이미지들 추출
+            crop_images = result.get('suspect_crop_images', [])  # ✅ 올바른 키
+            timeline_data = result.get('suspects_timeline', [])
+            
+            # 🎯 경찰이 선택할 수 있는 형태로 변환
+            detection_candidates = []
+            for i, crop_img in enumerate(crop_images):
+                detection_candidates.append({
+                    'detection_id': f"detection_{i+1}",
+                    'suspect_id': crop_img.get('suspect_id', f'suspect_{i+1}'),
+                    'similarity': crop_img.get('similarity', 0),
+                    'similarity_percentage': f"{crop_img.get('similarity', 0) * 100:.1f}%",
+                    'cropped_image_base64': crop_img.get('cropped_image', ''),
+                    'timestamp': crop_img.get('timestamp', ''),
+                    'confidence_level': 'high' if crop_img.get('similarity', 0) > 0.8 else 'medium'
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'status': 'completed',
+                'detection_candidates': detection_candidates,
+                'total_detections': len(detection_candidates),
+                'timeline_data': timeline_data,
+                'analysis_summary': result.get('investigation_summary', {}),
+                'message': f'{len(detection_candidates)}개의 용의자 후보가 발견되었습니다'
+            })
+            
+        elif response.status_code == 400:
+            # 아직 분석 중
+            return JsonResponse({
+                'success': False,
+                'status': 'incomplete',
+                'message': '분석이 아직 완료되지 않았습니다'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'결과 조회 실패: {response.status_code}'
+            }, status=500)
+            
+    except Exception as e:
+        logger.error(f"분석 결과 조회 실패: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+    
+@csrf_exempt
 def ai_health_check(request):
-    """AI 서비스 상태 확인 (미구현)"""
+    """AI 서비스 상태 확인"""
+    try:
+        gateway_url = os.getenv('AI_GATEWAY_URL', 'http://api-gateway:8000')
+        
+        response = requests.get(f"{gateway_url}/health", timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            return JsonResponse({
+                'ai_services': {
+                    'status': 'healthy',
+                    'gateway_connected': True,
+                    'details': result
+                },
+                'django_integration': 'active',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return JsonResponse({
+                'ai_services': {
+                    'status': 'unhealthy', 
+                    'gateway_connected': False,
+                    'error': f'HTTP {response.status_code}'
+                },
+                'django_integration': 'active',
+                'timestamp': datetime.now().isoformat()
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'ai_services': {
+                'status': 'unreachable',
+                'gateway_connected': False, 
+                'error': str(e)
+            },
+            'django_integration': 'active',
+            'timestamp': datetime.now().isoformat()
+        })
+    
+@csrf_exempt
+def test_cctv_connection(request, case_id):
+    """CCTV 연결 테스트"""
     return JsonResponse({
-        'ai_services': {'status': 'not_implemented'},
-        'django_integration': 'active',
-        'timestamp': datetime.now().isoformat(),
-        'message': 'AI 서비스는 아직 구현되지 않았습니다'
-    }, json_dumps_params={'ensure_ascii': False})
+        'success': True,
+        'message': f'CCTV 엔드포인트 연결 성공! case_id: {case_id}',
+        'method': request.method,
+        'case_id': case_id
+    })

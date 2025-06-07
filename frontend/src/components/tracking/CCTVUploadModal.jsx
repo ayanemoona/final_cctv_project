@@ -180,29 +180,45 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
   };
 
   const handleAnalysisComplete = (results) => {
+    console.log("🎉 AI 분석 완료:", results);
+
+    // ✅ 분석 상태 업데이트
     setAnalysisState((prev) => ({
       ...prev,
       isAnalyzing: false,
       progress: 100,
       status: "completed",
-      statusMessage: `✅ 분석 완료! ${results.markers_created}개 마커 생성됨`,
+      statusMessage: `✅ 분석 완료! ${
+        results.detection_candidates?.length || 0
+      }명의 용의자 후보 발견`,
       results: results,
     }));
 
-    console.log("🎉 AI 분석 완료:", results);
+    // ✅ 분석 결과가 있으면 바로 결과 모달 표시
+    if (
+      results.detection_candidates &&
+      results.detection_candidates.length > 0
+    ) {
+      // 부모 컴포넌트에 분석 결과 전달 (분석 완료됨을 알림)
+      onUpload({
+        success: true,
+        isCompleted: true, // ✅ 완료 플래그 추가
+        analysisResults: results, // ✅ 결과 데이터 전달
+        detection_candidates: results.detection_candidates,
+        total_detections: results.total_detections || 0,
+        timeline_data: results.timeline_data || [],
+        processing_time: results.processing_time || 0,
+      });
 
-    // 부모 컴포넌트에 완료 알림
-    onUpload({
-      success: true,
-      analysis_id: results.analysis_id,
-      markers_created: results.markers_created,
-      markers: results.markers,
-    });
-
-    // 성공 메시지 표시 후 모달 닫기
-    setTimeout(() => {
+      // ✅ 2초 후 모달 닫기
+      setTimeout(() => {
+        handleClose();
+      }, 2000);
+    } else {
+      // 용의자를 찾지 못한 경우
+      alert("분석이 완료되었지만 용의자 후보를 찾지 못했습니다.");
       handleClose();
-    }, 2000);
+    }
   };
 
   const handleAnalysisError = (error) => {
@@ -220,6 +236,7 @@ export const CCTVUploadModal = ({ isOpen, onClose, onUpload, caseId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("🔍 caseId 확인:", caseId);
 
     if (loading || analysisState.isAnalyzing) {
       console.log("🚫 이미 처리 중이므로 요청 무시");

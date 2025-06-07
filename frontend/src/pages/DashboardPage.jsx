@@ -1,5 +1,6 @@
 // src/pages/DashboardPage.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Header } from '../components/common/Header.jsx';
 import { CaseList } from '../components/cases/CaseList.jsx';
@@ -8,8 +9,11 @@ import { CreateCaseModal } from '../components/cases/CreateCaseModal.jsx';
 import { LoadingSpinner } from '../components/common/LoadingSpinner.jsx';
 import { ErrorMessage } from '../components/common/ErrorMessage.jsx';
 import { useCases } from '../hooks/useCases.js';
+import { useAuth } from '../hooks/useAuth.js';
 
-export const DashboardPage = ({ user, onLogout, onSelectCase }) => {
+export const DashboardPage = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { cases, loading, error, createCase, fetchCases } = useCases();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +33,11 @@ export const DashboardPage = ({ user, onLogout, onSelectCase }) => {
     }
   };
 
+  // ✅ 케이스 선택 시 라우터로 이동
+  const handleSelectCase = (case_) => {
+    navigate(`/case/${case_.id}`);
+  };
+
   const headerActions = [
     {
       label: '사건 등록',
@@ -46,12 +55,13 @@ export const DashboardPage = ({ user, onLogout, onSelectCase }) => {
     );
   }
 
-  return (
+
+ return (
     <div className="dashboard-page">
       <Header 
         title="🎯 사건 관리 시스템"
         user={user}
-        onLogout={onLogout}
+        onLogout={logout}
         actions={headerActions}
       />
 
@@ -69,7 +79,7 @@ export const DashboardPage = ({ user, onLogout, onSelectCase }) => {
 
         <CaseList 
           cases={filteredCases}
-          onSelectCase={onSelectCase}
+          onSelectCase={handleSelectCase}
         />
       </div>
 

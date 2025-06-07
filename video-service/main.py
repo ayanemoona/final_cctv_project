@@ -38,8 +38,8 @@ app.add_middleware(
 
 # 서비스 엔드포인트
 SERVICES = {
-    "yolo": "http://localhost:8001",
-    "clothing": "http://localhost:8002"
+    "yolo": os.getenv('YOLO_SERVICE_URL', 'http://yolo-service:8001'),
+    "clothing": os.getenv('CLOTHING_SERVICE_URL', 'http://clothing-service:8002'),
 }
 
 # 🚀 1. 스마트 프레임 스킵 시스템

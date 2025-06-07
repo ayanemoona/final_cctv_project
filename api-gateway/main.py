@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import asyncio
 from datetime import datetime
 import uuid
+import os
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -30,10 +31,11 @@ app.add_middleware(
 
 # 서비스 엔드포인트 설정
 SERVICES = {
-    "yolo": "http://localhost:8001",
-    "clothing": "http://localhost:8002",
-    "video": "http://localhost:8004"
+    "yolo": os.getenv('YOLO_SERVICE_URL', 'http://yolo-service:8001'),
+    "clothing": os.getenv('CLOTHING_SERVICE_URL', 'http://clothing-service:8002'),
+    "video": os.getenv('VIDEO_SERVICE_URL', 'http://video-service:8004')
 }
+
 
 # 수사 데이터베이스
 investigation_cases = {}
