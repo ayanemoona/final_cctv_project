@@ -150,25 +150,57 @@ export const MapView = ({
   };
 
   // ✅ 선택된 마커만 노란 테두리 표시하도록 오버레이 업데이트
+  // ✅ 선택된 마커만 노란 테두리 표시하도록 오버레이 업데이트
   const updateMarkerOverlays = () => {
-    overlays.current.forEach((overlay, index) => {
-      const marker = markers[index];
+    // ✅ 현재 시간순으로 정렬된 마커 목록 생성
+    const currentSortedMarkers = [...markers].sort((a, b) => {
+      const dateA = new Date(a.detected_at);
+      const dateB = new Date(b.detected_at);
+
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA.getTime() - dateB.getTime();
+      }
+
+      return (a.sequence_order || 0) - (b.sequence_order || 0);
+    });
+
+    overlays.current.forEach((overlay, overlayIndex) => {
+      const marker = currentSortedMarkers[overlayIndex]; // ✅ 정렬된 순서 사용
       if (!marker) return;
 
       const markerClass =
         marker.is_confirmed && !marker.is_excluded ? "confirmed" : "excluded";
       const selectedClass = selectedMarkerId === marker.id ? "selected" : "";
 
+      // ✅ 제외 마커는 ❌ 표시, 일반 마커는 순서 번호 표시
+      let displayContent;
+      if (marker.is_excluded) {
+        displayContent = "❌";
+      } else {
+        // 제외되지 않은 마커들만 필터링해서 순서 계산
+        const trackingMarkers = currentSortedMarkers
+          .filter((m) => !m.is_excluded)
+          .sort(
+            (a, b) =>
+              new Date(a.detected_at).getTime() -
+              new Date(b.detected_at).getTime()
+          );
+
+        const trackingIndex = trackingMarkers.findIndex(
+          (m) => m.id === marker.id
+        );
+        displayContent = trackingIndex + 1;
+      }
+
       const content = `
-        <div class="marker-overlay ${markerClass} ${selectedClass}">
-          ${index + 1}
-        </div>
-      `;
+      <div class="marker-overlay ${markerClass} ${selectedClass}">
+        ${displayContent}
+      </div>
+    `;
 
       overlay.setContent(content);
     });
   };
-
   // ✅ 수정된 useEffect - 단일 선택 + 화살표 제거
   useEffect(() => {
     if (!mapReady || !window.kakao || !mapObjRef.current) return;
@@ -237,9 +269,29 @@ export const MapView = ({
         class: markerClass,
       });
 
+      // ✅ 제외 마커는 ❌ 표시, 일반 마커는 실제 추적 순서 번호 표시
+      let markerContent;
+      if (marker.is_excluded) {
+        markerContent = "❌";
+      } else {
+        // ✅ 제외되지 않은 마커들만 필터링해서 현재 마커의 순서 계산
+        const trackingMarkers = sortedMarkers
+          .filter((m) => !m.is_excluded)
+          .sort(
+            (a, b) =>
+              new Date(a.detected_at).getTime() -
+              new Date(b.detected_at).getTime()
+          );
+
+        const trackingIndex = trackingMarkers.findIndex(
+          (m) => m.id === marker.id
+        );
+        markerContent = trackingIndex >= 0 ? trackingIndex + 1 : "?";
+      }
+
       const content = `
         <div class="marker-overlay ${markerClass} ${selectedClass}">
-          ${sortedIndex + 1}
+          ${markerContent}
         </div>
       `;
 
@@ -313,8 +365,14 @@ export const MapView = ({
 
       kakaoMarkers.current.push(kakaoMarker);
       overlays.current.push(overlay);
-      bounds.extend(position);
-      sortedPositions.push(position);
+      // ✅ 제외 마커가 아닌 경우만 경로에 포함
+      if (!marker.is_excluded) {
+        bounds.extend(position);
+        sortedPositions.push(position);
+        console.log(`✅ 경로에 포함: ${marker.location_name}`);
+      } else {
+        console.log(`🚫 제외 마커 - 경로에서 제외: ${marker.location_name}`);
+      }
     };
 
     // ✅ 순서 보장된 마커 처리 함수
@@ -377,23 +435,30 @@ export const MapView = ({
     };
 
     // ✅ 순서대로 처리 실행
+    // ✅ 순서대로 처리 실행
     processMarkersInOrder().then((processedMarkers) => {
       console.log(`✅ 마커 순서대로 처리 완료: ${processedMarkers.length}개`);
 
-      // ✅ 화살표 없이 경로선만 그리기
       setTimeout(() => {
         if (sortedPositions.length > 1) {
           drawPath(sortedPositions);
         }
 
-        // 지도 영역 조정 (모든 마커가 보이도록)
-        if (sortedMarkers.length > 0 && bounds) {
-          mapObjRef.current.setBounds(bounds);
+        // ✅ 지도 영역 조정 - 모든 마커가 보이도록 (수정됨)
+        if (sortedMarkers.length > 0) {
+          // bounds에 마커가 제대로 포함되었는지 확인
+          const finalBounds = new window.kakao.maps.LatLngBounds();
+          kakaoMarkers.current.forEach((marker) => {
+            finalBounds.extend(marker.getPosition());
+          });
+
+          if (kakaoMarkers.current.length > 0) {
+            mapObjRef.current.setBounds(finalBounds);
+            console.log("🗺️ 지도 영역을 마커들에 맞게 조정");
+          }
         }
 
-        console.log(
-          `📍 순서 보장된 마커 ${sortedMarkers.length}개 표시 완료 (화살표 제거됨)`
-        );
+        console.log(`📍 순서 보장된 마커 ${sortedMarkers.length}개 표시 완료`);
       }, 300);
     });
   }, [mapReady, markers, showPath]);
@@ -406,7 +471,7 @@ export const MapView = ({
         `🎯 마커 선택 상태 업데이트: ${selectedMarkerId || "선택 없음"}`
       );
     }
-  }, [selectedMarkerId]);
+  }, [selectedMarkerId, markers]);
 
   return (
     <div className="map-area">

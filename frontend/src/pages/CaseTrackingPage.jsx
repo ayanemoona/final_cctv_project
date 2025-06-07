@@ -321,13 +321,36 @@ const handleConfirmSuspect = async (selectedCandidate) => {
     );
   }
   // ✅ 제외 마커 생성 함수 추가
+// ✅ 제외 마커 생성 함수 수정
 const handleCreateExcludedMarker = async (excludeData) => {
   try {
-    console.log('🚫 제외 마커 생성:', excludeData);
+    console.log('🚫 제외 마커 생성 요청:', excludeData);
+    
+    // ✅ excludeData에서 실제 위치 정보 확인
+    let location_name = excludeData.location_name;
+    let incident_time = excludeData.incident_time;
+    
+    console.log('📍 제외 마커 위치 정보:', { location_name, incident_time });
+    
+    // ✅ 위치 정보가 없거나 기본값이면 localStorage에서 다시 찾기
+    if (!location_name || location_name === '분석 거부 지점' || location_name === '알 수 없는 위치') {
+      console.log('⚠️ 기본 위치 감지 - localStorage에서 실제 위치 찾는 중...');
+      
+      // 현재 케이스의 가장 최근 CCTV 업로드 정보 찾기
+      const cctvKey = `cctv_upload_${currentCase.id}`;
+      const storedCctvInfo = localStorage.getItem(cctvKey);
+      
+      if (storedCctvInfo) {
+        const parsed = JSON.parse(storedCctvInfo);
+        location_name = parsed.location_name;
+        incident_time = parsed.incident_time;
+        console.log('💾 localStorage에서 복원된 실제 위치:', { location_name, incident_time });
+      }
+    }
     
     const markerData = {
-      location_name: excludeData.location_name,
-      detected_at: excludeData.incident_time,
+      location_name: location_name || '알 수 없는 위치',
+      detected_at: incident_time || new Date().toISOString(),
       police_comment: `분석 거부 - ${excludeData.reason}`,
       confidence_score: 0,
       is_confirmed: false,
@@ -335,6 +358,8 @@ const handleCreateExcludedMarker = async (excludeData) => {
       analysis_id: excludeData.analysis_id,
       ai_generated: true
     };
+    
+    console.log('📍 최종 마커 생성 데이터:', markerData);
     
     const newMarker = await trackingService.addMarker(currentCase.id, markerData);
     
@@ -347,7 +372,7 @@ const handleCreateExcludedMarker = async (excludeData) => {
       setSelectedMarkerId(newMarker.id);
     }
     
-    alert('❌ 분석을 거부했습니다.\n해당 지점이 빨간색 제외 마커로 표시되었습니다.');
+    alert(`❌ 분석을 거부했습니다.\n📍 위치: ${markerData.location_name}\n해당 지점이 빨간색 제외 마커로 표시되었습니다.`);
     
   } catch (error) {
     console.error('❌ 제외 마커 생성 실패:', error);
