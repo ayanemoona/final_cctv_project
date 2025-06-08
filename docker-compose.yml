@@ -70,6 +70,9 @@ services:
       - api-gateway
     environment:
       - DEBUG=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
       - DATABASE_URL=postgres://postgres:password@db:5432/police_cctv
       - AI_GATEWAY_URL=http://api-gateway:8000
       - YOLO_SERVICE_URL=http://yolo-service:8001
@@ -79,6 +82,8 @@ services:
       - ./backend:/app
       - ./shared_storage/media:/app/media
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
 
   # 🟢 React 프론트엔드
   frontend:

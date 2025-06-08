@@ -1,6 +1,7 @@
 // src/components/tracking/MarkerList.jsx - 시간순 정렬 적용
 import React from "react";
 import { formatTime, formatConfidence } from "../../utils/formatters.js";
+import { FileText } from "lucide-react";
 
 export const MarkerList = ({
   case_,
@@ -9,6 +10,7 @@ export const MarkerList = ({
   onSelectMarker,
   onShowUploadModal,
   onShowManualModal,
+  onGenerateMarkerPDF,
 }) => {
   // ✅ 시간순으로 정렬된 마커 생성
   const sortedMarkers = [...markers].sort((a, b) => {
@@ -34,13 +36,32 @@ export const MarkerList = ({
   );
 
   const getTrackingNumber = (currentMarker, allMarkers) => {
-  const trackingMarkers = allMarkers
-    .filter(m => !m.is_excluded)
-    .sort((a, b) => new Date(a.detected_at).getTime() - new Date(b.detected_at).getTime());
-  
-  const trackingIndex = trackingMarkers.findIndex(m => m.id === currentMarker.id);
-  return trackingIndex + 1;
-};
+    const trackingMarkers = allMarkers
+      .filter((m) => !m.is_excluded)
+      .sort(
+        (a, b) =>
+          new Date(a.detected_at).getTime() - new Date(b.detected_at).getTime()
+      );
+
+    const trackingIndex = trackingMarkers.findIndex(
+      (m) => m.id === currentMarker.id
+    );
+    return trackingIndex + 1;
+  };
+  // ✅ 개별 마커 PDF 생성 핸들러
+  const handleMarkerPDFClick = (e, marker) => {
+    e.stopPropagation(); // 마커 선택 이벤트 방지
+
+    // X 마커는 PDF 생성 차단
+    if (marker.is_excluded) {
+      alert("❌ 제외된 마커는 보고서를 생성할 수 없습니다.");
+      return;
+    }
+
+    if (onGenerateMarkerPDF) {
+      onGenerateMarkerPDF(marker);
+    }
+  };
 
   return (
     <div className="sidebar">
@@ -103,6 +124,9 @@ export const MarkerList = ({
       <div className="markers-container">
         <div className="markers-header">
           이동 경로 (시간순) ({markers.length}개)
+          <span className="trackable-count">
+            추적 가능: {markers.filter(m => !m.is_excluded).length}개
+          </span>
         </div>
 
         {sortedMarkers.map((marker) => (
@@ -111,13 +135,28 @@ export const MarkerList = ({
             onClick={() => onSelectMarker(marker.id)}
             className={`marker-item ${
               selectedMarkerId === marker.id ? "selected" : ""
-            }`}
+            } ${marker.is_excluded ? "excluded" : ""}`}
           >
-            {/* ✅ 제외 마커는 ❌, 일반 마커는 추적 번호 표시 */}
-            <div className="marker-number">
-              {marker.is_excluded
-                ? "❌"
-                : getTrackingNumber(marker, sortedMarkers)}
+            {/* 마커 헤더 (번호 + PDF 버튼) */}
+            <div className="marker-header">
+              {/* ✅ 제외 마커는 ❌, 일반 마커는 추적 번호 표시 */}
+              <div className="marker-number">
+                {marker.is_excluded
+                  ? "❌"
+                  : getTrackingNumber(marker, sortedMarkers)}
+              </div>
+
+              {/* ✅ PDF 버튼 (추적 가능한 마커만) */}
+              {!marker.is_excluded && onGenerateMarkerPDF && (
+                <button
+                  onClick={(e) => handleMarkerPDFClick(e, marker)}
+                  className="marker-pdf-btn"
+                  title="마커 상세 보고서 생성"
+                  aria-label="PDF 보고서 생성"
+                >
+                  <FileText size={14} />
+                </button>
+              )}
             </div>
 
             <div className="marker-time">

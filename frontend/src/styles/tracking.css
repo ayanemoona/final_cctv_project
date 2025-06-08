@@ -266,3 +266,70 @@
     width: 60%;
   }
 }
+
+/* 마커 헤더 (번호 + PDF 버튼) */
+.marker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.marker-number {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #1f2937;
+  min-width: 2rem;
+  text-align: center;
+}
+
+/* PDF 버튼 스타일 */
+.marker-pdf-btn {
+  padding: 0.25rem;
+  background-color: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+}
+
+.marker-pdf-btn:hover {
+  background-color: #e0f2fe;
+  color: #0277bd;
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.marker-pdf-btn:active {
+  transform: scale(0.95);
+}
+
+/* 추적 가능한 마커 수 표시 */
+.trackable-count {
+  font-size: 0.75rem;
+  color: #16a34a;
+  font-weight: 500;
+  background-color: #dcfce7;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+/* 마커 헤더 개선 */
+.markers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  flex-wrap: wrap;
+}

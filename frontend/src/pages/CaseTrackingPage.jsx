@@ -11,6 +11,8 @@ import { LoadingSpinner } from "../components/common/LoadingSpinner.jsx";
 import { trackingService } from "../services/trackingService.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useCases } from "../hooks/useCases.js";
+import { FileText, Download } from "lucide-react";
+import { htmlToPdfService as pdfService } from '../services/htmlToPdfService.js';
 
 export const CaseTrackingPage = () => {
   const { caseId, analysisId } = useParams();
@@ -25,6 +27,7 @@ export const CaseTrackingPage = () => {
   const [showManualModal, setShowManualModal] = useState(false);
   const [showAnalysisResults, setShowAnalysisResults] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [progress, setProgress] = useState({
     show: false,
     text: "",
@@ -79,6 +82,72 @@ export const CaseTrackingPage = () => {
       console.error("마커 로드 실패:", err);
     }
   }, [currentCase]);
+
+  // ✅ 전체 사건 추적 보고서 생성
+  const handleGeneratePDFReport = useCallback(async () => {
+    if (!currentCase || !markers || markers.length === 0) {
+      alert("⚠️ 보고서를 생성할 데이터가 없습니다.");
+      return;
+    }
+
+    // 추적 가능한 마커만 확인
+    const trackableMarkers = markers.filter(
+      (m) => m.is_confirmed && !m.is_excluded
+    );
+    if (trackableMarkers.length === 0) {
+      alert("⚠️ 추적 가능한 마커가 없어 보고서를 생성할 수 없습니다.");
+      return;
+    }
+
+    try {
+      setIsGeneratingPDF(true);
+      console.log("📄 전체 사건 추적 보고서 생성 시작");
+
+      // 지도 요소 ID 전달 (지도 캡처용)
+      const mapElementId = "kakao-map-container";
+
+      const result = await pdfService.generateCaseTrackingReport(
+        currentCase,
+        markers,
+        mapElementId
+      );
+
+      console.log("✅ PDF 보고서 생성 완료:", result);
+      alert(
+        `✅ 사건 추적 보고서가 다운로드되었습니다!\n(추적 마커 ${result.markerCount}개 포함)`
+      );
+    } catch (error) {
+      console.error("❌ PDF 생성 실패:", error);
+      alert(`❌ PDF 생성 실패: ${error.message}`);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  }, [currentCase, markers]);
+
+  // ✅ 개별 마커 상세 보고서 생성
+  const handleGenerateMarkerPDF = useCallback(
+    async (marker) => {
+      if (!currentCase || !marker) {
+        alert("⚠️ 마커 정보가 없습니다.");
+        return;
+      }
+
+      try {
+        console.log("📄 마커 상세 보고서 생성 시작:", marker.location_name);
+
+        await pdfService.generateMarkerDetailReport(currentCase, marker);
+
+        console.log("✅ 마커 상세 보고서 생성 완료");
+        alert(
+          `✅ "${marker.location_name}" 마커 상세 보고서가 다운로드되었습니다!`
+        );
+      } catch (error) {
+        console.error("❌ 마커 PDF 생성 실패:", error);
+        alert(`❌ 마커 보고서 생성 실패: ${error.message}`);
+      }
+    },
+    [currentCase]
+  );
 
   // ✅ URL 파라미터로부터 케이스 정보 가져오기
   useEffect(() => {
@@ -177,111 +246,127 @@ export const CaseTrackingPage = () => {
   };
   // ✅ 용의자 확정 → 마커 생성 함수
   // ✅ handleConfirmSuspect 함수 수정 (CCTV 정보 활용)
-const handleConfirmSuspect = async (selectedCandidate) => {
-  try {
-    console.log('🎯 용의자 확정:', selectedCandidate);
-    
-    // ✅ analysisResults에서 CCTV 정보 가져오기
-    let cctvInfo = analysisResults?.cctv_info || {};
-    console.log('📋 CCTV 정보 확인:', cctvInfo);
+  const handleConfirmSuspect = async (selectedCandidate) => {
+    try {
+      console.log("🎯 용의자 확정:", selectedCandidate);
 
-    // ✅ 2차: localStorage에서 CCTV 정보 가져오기 (새로 추가)
-    if (!cctvInfo.location_name || !cctvInfo.incident_time) {
-      // 분석 ID로 정보 찾기
+      // ✅ analysisResults에서 CCTV 정보 가져오기
+      let cctvInfo = analysisResults?.cctv_info || {};
+      console.log("📋 CCTV 정보 확인:", cctvInfo);
+
+      // ✅ 2차: localStorage에서 CCTV 정보 가져오기 (새로 추가)
+      if (!cctvInfo.location_name || !cctvInfo.incident_time) {
+        // 분석 ID로 정보 찾기
+        const analysisId = analysisResults?.analysis_id;
+        if (analysisId) {
+          const storedAnalysisInfo = localStorage.getItem(
+            `analysis_${analysisId}`
+          );
+          if (storedAnalysisInfo) {
+            const parsedInfo = JSON.parse(storedAnalysisInfo);
+            cctvInfo = {
+              location_name: parsedInfo.location_name,
+              incident_time: parsedInfo.incident_time,
+              officer_name: parsedInfo.officer_name || "",
+              case_number: parsedInfo.caseId || currentCase.id,
+            };
+            console.log("💾 localStorage에서 복원된 CCTV 정보:", cctvInfo);
+          }
+        }
+
+        // 3차: 케이스 ID로 정보 찾기
+        if (!cctvInfo.location_name) {
+          const storedCctvInfo = localStorage.getItem(
+            `cctv_upload_${currentCase.id}`
+          );
+          if (storedCctvInfo) {
+            const parsedInfo = JSON.parse(storedCctvInfo);
+            cctvInfo = {
+              location_name: parsedInfo.location_name,
+              incident_time: parsedInfo.incident_time,
+              officer_name: "",
+              case_number: currentCase.id,
+            };
+            console.log("💾 케이스 ID로 복원된 CCTV 정보:", cctvInfo);
+          }
+        }
+      }
+
+      // ✅ 최종 검증
+      if (!cctvInfo.location_name) {
+        console.warn("⚠️ CCTV 위치 정보 없음 - 기본값 사용");
+        cctvInfo.location_name = "분석 완료 지점";
+      }
+
+      if (!cctvInfo.incident_time) {
+        console.warn("⚠️ CCTV 시간 정보 없음 - 현재 시간 사용");
+        cctvInfo.incident_time = new Date().toISOString();
+      }
+
+      console.log("✅ 최종 사용할 CCTV 정보:", cctvInfo);
+
+      // ✅ CCTV 업로드시 입력한 위치와 시간으로 마커 1개만 생성
+      const markerData = {
+        location_name: cctvInfo.location_name || "탐지 지점",
+        detected_at: cctvInfo.incident_time || new Date().toISOString(),
+        police_comment: `AI 분석 결과 - 유사도: ${selectedCandidate.similarity_percentage} (${selectedCandidate.confidence_level} 신뢰도)`,
+        confidence_score:
+          parseFloat(selectedCandidate.similarity_percentage.replace("%", "")) /
+          100,
+        is_confirmed: true,
+        is_excluded: false,
+        analysis_id: analysisResults.analysis_id || null,
+        ai_generated: true,
+        // ✅ 선택된 용의자의 추가 정보
+        suspect_info: JSON.stringify({
+          detection_id: selectedCandidate.detection_id,
+          similarity_percentage: selectedCandidate.similarity_percentage,
+          confidence_level: selectedCandidate.confidence_level,
+          total_appearances: selectedCandidate.total_appearances || 1,
+          timestamp: selectedCandidate.timestamp,
+        }),
+      };
+
+      console.log("📍 마커 생성 중 (CCTV 입력 위치):", markerData);
+
+      const newMarker = await trackingService.addMarker(
+        currentCase.id,
+        markerData
+      );
+
+      console.log("✅ 마커 생성 완료:", newMarker);
+
+      // ✅ localStorage 정리 (선택사항)
       const analysisId = analysisResults?.analysis_id;
       if (analysisId) {
-        const storedAnalysisInfo = localStorage.getItem(`analysis_${analysisId}`);
-        if (storedAnalysisInfo) {
-          const parsedInfo = JSON.parse(storedAnalysisInfo);
-          cctvInfo = {
-            location_name: parsedInfo.location_name,
-            incident_time: parsedInfo.incident_time,
-            officer_name: parsedInfo.officer_name || '',
-            case_number: parsedInfo.caseId || currentCase.id
-          };
-          console.log('💾 localStorage에서 복원된 CCTV 정보:', cctvInfo);
-        }
+        localStorage.removeItem(`analysis_${analysisId}`);
+        localStorage.removeItem(`cctv_upload_${currentCase.id}`);
+        console.log("🗑️ localStorage 정리 완료");
       }
-      
-      // 3차: 케이스 ID로 정보 찾기
-      if (!cctvInfo.location_name) {
-        const storedCctvInfo = localStorage.getItem(`cctv_upload_${currentCase.id}`);
-        if (storedCctvInfo) {
-          const parsedInfo = JSON.parse(storedCctvInfo);
-          cctvInfo = {
-            location_name: parsedInfo.location_name,
-            incident_time: parsedInfo.incident_time,
-            officer_name: '',
-            case_number: currentCase.id
-          };
-          console.log('💾 케이스 ID로 복원된 CCTV 정보:', cctvInfo);
-        }
-      }
-    }
-    
-    // ✅ 최종 검증
-    if (!cctvInfo.location_name) {
-      console.warn('⚠️ CCTV 위치 정보 없음 - 기본값 사용');
-      cctvInfo.location_name = '분석 완료 지점';
-    }
-    
-    if (!cctvInfo.incident_time) {
-      console.warn('⚠️ CCTV 시간 정보 없음 - 현재 시간 사용');
-      cctvInfo.incident_time = new Date().toISOString();
-    }
-    
-    console.log('✅ 최종 사용할 CCTV 정보:', cctvInfo);
-    
-    // ✅ CCTV 업로드시 입력한 위치와 시간으로 마커 1개만 생성
-    const markerData = {
-      location_name: cctvInfo.location_name || '탐지 지점',
-      detected_at: cctvInfo.incident_time || new Date().toISOString(),
-      police_comment: `AI 분석 결과 - 유사도: ${selectedCandidate.similarity_percentage} (${selectedCandidate.confidence_level} 신뢰도)`,
-      confidence_score: parseFloat(selectedCandidate.similarity_percentage.replace('%', '')) / 100,
-      is_confirmed: true,
-      is_excluded: false,
-      analysis_id: analysisResults.analysis_id || null,
-      ai_generated: true,
-      // ✅ 선택된 용의자의 추가 정보
-      suspect_info: JSON.stringify({
-        detection_id: selectedCandidate.detection_id,
-        similarity_percentage: selectedCandidate.similarity_percentage,
-        confidence_level: selectedCandidate.confidence_level,
-        total_appearances: selectedCandidate.total_appearances || 1,
-        timestamp: selectedCandidate.timestamp
-      })
-    };
-    
-    console.log('📍 마커 생성 중 (CCTV 입력 위치):', markerData);
-    
-    const newMarker = await trackingService.addMarker(currentCase.id, markerData);
-    
-    console.log('✅ 마커 생성 완료:', newMarker);
 
-    // ✅ localStorage 정리 (선택사항)
-    const analysisId = analysisResults?.analysis_id;
-    if (analysisId) {
-      localStorage.removeItem(`analysis_${analysisId}`);
-      localStorage.removeItem(`cctv_upload_${currentCase.id}`);
-      console.log('🗑️ localStorage 정리 완료');
+      // 마커 목록 새로고침
+      await loadMarkers();
+
+      // 생성된 마커 선택
+      if (newMarker && newMarker.id) {
+        setSelectedMarkerId(newMarker.id);
+      }
+
+      alert(
+        `✅ 용의자 확정 완료!\n\n📍 위치: ${
+          markerData.location_name
+        }\n⏰ 시간: ${new Date(markerData.detected_at).toLocaleString(
+          "ko-KR"
+        )}\n🎯 유사도: ${selectedCandidate.similarity_percentage}\n📊 신뢰도: ${
+          selectedCandidate.confidence_level
+        }`
+      );
+    } catch (error) {
+      console.error("❌ 용의자 확정 실패:", error);
+      alert("용의자 확정 중 오류가 발생했습니다.");
+      throw error;
     }
-    
-    // 마커 목록 새로고침
-    await loadMarkers();
-    
-    // 생성된 마커 선택
-    if (newMarker && newMarker.id) {
-      setSelectedMarkerId(newMarker.id);
-    }
-    
-    alert(`✅ 용의자 확정 완료!\n\n📍 위치: ${markerData.location_name}\n⏰ 시간: ${new Date(markerData.detected_at).toLocaleString('ko-KR')}\n🎯 유사도: ${selectedCandidate.similarity_percentage}\n📊 신뢰도: ${selectedCandidate.confidence_level}`);
-    
-  } catch (error) {
-    console.error('❌ 용의자 확정 실패:', error);
-    alert('용의자 확정 중 오류가 발생했습니다.');
-    throw error;
-  }
-};
+  };
 
   const handleManualAdd = async (markerData) => {
     try {
@@ -301,11 +386,14 @@ const handleConfirmSuspect = async (selectedCandidate) => {
     navigate("/dashboard");
   };
 
+  // ✅ Header actions 업데이트 (PDF 버튼 추가)
   const headerActions = [
     {
-      label: "보고서 생성",
-      onClick: () => alert("보고서 생성 기능 준비 중"),
-      className: "btn btn-primary",
+      label: isGeneratingPDF ? '생성중...' : '보고서',
+      icon: isGeneratingPDF ? <Download size={16} className="animate-spin" /> : <FileText size={16} />,
+      onClick: handleGeneratePDFReport,
+      className: `btn ${isGeneratingPDF ? 'btn-secondary' : 'btn-success'}`,
+      disabled: isGeneratingPDF || !markers || markers.filter(m => !m.is_excluded).length === 0
     },
   ];
 
@@ -321,65 +409,78 @@ const handleConfirmSuspect = async (selectedCandidate) => {
     );
   }
   // ✅ 제외 마커 생성 함수 추가
-// ✅ 제외 마커 생성 함수 수정
-const handleCreateExcludedMarker = async (excludeData) => {
-  try {
-    console.log('🚫 제외 마커 생성 요청:', excludeData);
-    
-    // ✅ excludeData에서 실제 위치 정보 확인
-    let location_name = excludeData.location_name;
-    let incident_time = excludeData.incident_time;
-    
-    console.log('📍 제외 마커 위치 정보:', { location_name, incident_time });
-    
-    // ✅ 위치 정보가 없거나 기본값이면 localStorage에서 다시 찾기
-    if (!location_name || location_name === '분석 거부 지점' || location_name === '알 수 없는 위치') {
-      console.log('⚠️ 기본 위치 감지 - localStorage에서 실제 위치 찾는 중...');
-      
-      // 현재 케이스의 가장 최근 CCTV 업로드 정보 찾기
-      const cctvKey = `cctv_upload_${currentCase.id}`;
-      const storedCctvInfo = localStorage.getItem(cctvKey);
-      
-      if (storedCctvInfo) {
-        const parsed = JSON.parse(storedCctvInfo);
-        location_name = parsed.location_name;
-        incident_time = parsed.incident_time;
-        console.log('💾 localStorage에서 복원된 실제 위치:', { location_name, incident_time });
+  // ✅ 제외 마커 생성 함수 수정
+  const handleCreateExcludedMarker = async (excludeData) => {
+    try {
+      console.log("🚫 제외 마커 생성 요청:", excludeData);
+
+      // ✅ excludeData에서 실제 위치 정보 확인
+      let location_name = excludeData.location_name;
+      let incident_time = excludeData.incident_time;
+
+      console.log("📍 제외 마커 위치 정보:", { location_name, incident_time });
+
+      // ✅ 위치 정보가 없거나 기본값이면 localStorage에서 다시 찾기
+      if (
+        !location_name ||
+        location_name === "분석 거부 지점" ||
+        location_name === "알 수 없는 위치"
+      ) {
+        console.log(
+          "⚠️ 기본 위치 감지 - localStorage에서 실제 위치 찾는 중..."
+        );
+
+        // 현재 케이스의 가장 최근 CCTV 업로드 정보 찾기
+        const cctvKey = `cctv_upload_${currentCase.id}`;
+        const storedCctvInfo = localStorage.getItem(cctvKey);
+
+        if (storedCctvInfo) {
+          const parsed = JSON.parse(storedCctvInfo);
+          location_name = parsed.location_name;
+          incident_time = parsed.incident_time;
+          console.log("💾 localStorage에서 복원된 실제 위치:", {
+            location_name,
+            incident_time,
+          });
+        }
       }
+
+      const markerData = {
+        location_name: location_name || "알 수 없는 위치",
+        detected_at: incident_time || new Date().toISOString(),
+        police_comment: `분석 거부 - ${excludeData.reason}`,
+        confidence_score: 0,
+        is_confirmed: false,
+        is_excluded: true, // ✅ 제외 마커 (빨간색)
+        analysis_id: excludeData.analysis_id,
+        ai_generated: true,
+      };
+
+      console.log("📍 최종 마커 생성 데이터:", markerData);
+
+      const newMarker = await trackingService.addMarker(
+        currentCase.id,
+        markerData
+      );
+
+      console.log("✅ 제외 마커 생성 완료:", newMarker);
+
+      // 마커 목록 새로고침
+      await loadMarkers();
+
+      if (newMarker && newMarker.id) {
+        setSelectedMarkerId(newMarker.id);
+      }
+
+      alert(
+        `❌ 분석을 거부했습니다.\n📍 위치: ${markerData.location_name}\n해당 지점이 빨간색 제외 마커로 표시되었습니다.`
+      );
+    } catch (error) {
+      console.error("❌ 제외 마커 생성 실패:", error);
+      alert("제외 마커 생성 중 오류가 발생했습니다.");
+      throw error;
     }
-    
-    const markerData = {
-      location_name: location_name || '알 수 없는 위치',
-      detected_at: incident_time || new Date().toISOString(),
-      police_comment: `분석 거부 - ${excludeData.reason}`,
-      confidence_score: 0,
-      is_confirmed: false,
-      is_excluded: true,  // ✅ 제외 마커 (빨간색)
-      analysis_id: excludeData.analysis_id,
-      ai_generated: true
-    };
-    
-    console.log('📍 최종 마커 생성 데이터:', markerData);
-    
-    const newMarker = await trackingService.addMarker(currentCase.id, markerData);
-    
-    console.log('✅ 제외 마커 생성 완료:', newMarker);
-    
-    // 마커 목록 새로고침
-    await loadMarkers();
-    
-    if (newMarker && newMarker.id) {
-      setSelectedMarkerId(newMarker.id);
-    }
-    
-    alert(`❌ 분석을 거부했습니다.\n📍 위치: ${markerData.location_name}\n해당 지점이 빨간색 제외 마커로 표시되었습니다.`);
-    
-  } catch (error) {
-    console.error('❌ 제외 마커 생성 실패:', error);
-    alert('제외 마커 생성 중 오류가 발생했습니다.');
-    throw error;
-  }
-};
+  };
 
   return (
     <div className="tracking-page">
@@ -405,6 +506,7 @@ const handleCreateExcludedMarker = async (excludeData) => {
           onSelectMarker={setSelectedMarkerId}
           onShowUploadModal={() => setShowUploadModal(true)}
           onShowManualModal={() => setShowManualModal(true)}
+          onGenerateMarkerPDF={handleGenerateMarkerPDF}
         />
 
         <MapView

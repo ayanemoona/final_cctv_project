@@ -15,6 +15,7 @@ import uuid
 import os
 import requests
 from django.conf import settings
+from .services import ImageStorageService
 
 logger = logging.getLogger(__name__)
 
@@ -294,29 +295,12 @@ class CaseMarkersAPIView(APIView):
             # 용의자 사진 처리 (있는 경우)
             suspect_image = request.FILES.get('suspect_image')
             if suspect_image:
-                try:
-                    from django.conf import settings
-                    
-                    # 미디어 폴더 경로 설정
-                    if hasattr(settings, 'BASE_DIR'):
-                        media_dir = os.path.join(settings.BASE_DIR, 'media', 'markers')
-                    else:
-                        media_dir = os.path.join(os.getcwd(), 'media', 'markers')
-                    
-                    os.makedirs(media_dir, exist_ok=True)
-                    
-                    # 파일 저장
-                    file_path = os.path.join(media_dir, f"marker_{marker.id}.jpg")
-                    with open(file_path, 'wb') as f:
-                        for chunk in suspect_image.chunks():
-                            f.write(chunk)
-                    
-                    marker.crop_image_url = f"/media/markers/marker_{marker.id}.jpg"
-                    marker.save()
-                    
-                    logger.info(f"📷 마커 이미지 저장됨: {file_path}")
-                except Exception as file_error:
-                    logger.error(f"📷 파일 저장 실패: {file_error}")
+                storage_service = ImageStorageService()
+                public_url = storage_service.upload_marker_image(
+                    case.id, marker.id, suspect_image
+                )
+                marker.crop_image_url = public_url
+                marker.save()
             
             logger.info(f"✅ 마커 생성 성공: {marker.id} - {marker.location_name}")
             
