@@ -1,0 +1,31 @@
+# backend/requirements/production.txt
+-r base.txt
+
+# 프로덕션 웹서버
+gunicorn==21.2.0
+
+# 정적 파일 서빙
+whitenoise==6.6.0
+
+# 데이터베이스 URL 파싱
+dj-database-url==2.1.0
+
+# 보안 강화
+django-ratelimit==4.1.0
+django-axes==6.1.1
+
+# 성능 모니터링
+sentry-sdk[django]==1.38.0
+
+# 로깅 개선
+python-json-logger==2.0.7
+
+# 캐싱 (Redis)
+redis==5.0.1
+django-redis==5.4.0
+
+# 헬스체크
+django-health-check==3.17.0
+
+# 환경변수 관리
+python-decouple==3.8

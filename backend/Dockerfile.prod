@@ -1,0 +1,37 @@
+# backend/Dockerfile.prod
+FROM python:3.11-slim
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# Python 의존성 설치
+COPY requirements/ requirements/
+RUN pip install --no-cache-dir -r requirements/base.txt
+RUN pip install --no-cache-dir dj-database-url whitenoise
+
+# 애플리케이션 코드 복사
+COPY . .
+
+# 로그 디렉토리 생성
+RUN mkdir -p /var/log/django
+
+# 정적 파일 수집
+RUN python manage.py collectstatic --noinput --settings=config.settings.production
+
+# 헬스체크용 스크립트
+COPY docker-entrypoint-prod.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint-prod.sh
+
+# 포트 노출
+EXPOSE 8000
+
+# 프로덕션 진입점
+ENTRYPOINT ["docker-entrypoint-prod.sh"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "config.wsgi:application"]
